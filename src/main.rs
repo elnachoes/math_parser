@@ -129,7 +129,7 @@ fn eval_str(input : &str) -> Result<f64, String> {
 
     if let Err(err) = tokens_result {
         return Err(err)
-    }
+    };
 
     let eval_state = EvalState {
         index : 0,
@@ -139,7 +139,26 @@ fn eval_str(input : &str) -> Result<f64, String> {
     Err("eval".to_string())
 }
 
-// fn eval_add()
+///
+/// this will convert tokens : [..number(5)operator(+)number(5)..] to tokens : [..number(10)..]
+fn eval_add(eval_state : EvalState) -> Result<f64, String> {
+    
+    //note :  this would read on the index of the operator
+
+    // if the '+' is at the front or end of the list of tokens then it is an error
+    if eval_state.index + 1 == eval_state.tokens.len() || eval_state.index == 0{
+        return Err("error : expected number but found end of string".to_string())
+    }
+
+    let tokens = &eval_state.tokens[eval_state.index - 1..eval_state.index + 1];
+    
+    
+
+
+
+
+    Ok(0.0)
+}
 
 fn main() {
     println!("{:?}", parse_str("25 ^ (6*5)"));
