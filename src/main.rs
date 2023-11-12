@@ -1,14 +1,11 @@
-use std::iter::Enumerate;
-use itertools::{self, Itertools};
-use std::str::Chars;
+// use std::iter::Enumerate;
+// use std::str::Chars;
+// use itertools::{self, Itertools};
 
 #[derive(Clone, Copy, Debug)]
 enum Token {
-    None,
     Number(f64),
     Operator(Operator),
-    Varible,
-    Function,
     OpenParen,
     CloseParen,
 }
@@ -97,7 +94,6 @@ fn parse_char_token(parse_state : ParseState<'_>) -> Result<ParseState, String> 
     }
 }
 
-// note this should probably actually be a decimal*
 fn parse_number_token(parse_state : ParseState<'_>) -> Result<ParseState, String> {
     let mut end_number_index = parse_state.index;
     for ch in parse_state.input[parse_state.index..].chars() {
@@ -122,6 +118,28 @@ fn parse_number_token(parse_state : ParseState<'_>) -> Result<ParseState, String
         tokens: [parse_state.tokens.as_slice(), &[Token::Number(f64_parse_result.unwrap())]].concat()
     })
 }
+
+struct EvalState {
+    pub index : usize,
+    pub tokens : Vec<Token>
+}
+
+fn eval_str(input : &str) -> Result<f64, String> {
+    let tokens_result = parse_str(input);
+
+    if let Err(err) = tokens_result {
+        return Err(err)
+    }
+
+    let eval_state = EvalState {
+        index : 0,
+        tokens : tokens_result.unwrap()
+    };
+    
+    Err("eval".to_string())
+}
+
+// fn eval_add()
 
 fn main() {
     println!("{:?}", parse_str("25 ^ (6*5)"));
