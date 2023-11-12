@@ -2,6 +2,8 @@
 // use std::str::Chars;
 // use itertools::{self, Itertools};
 
+use core::num;
+
 #[derive(Clone, Copy, Debug)]
 enum Token {
     Number(f64),
@@ -141,7 +143,7 @@ fn eval_str(input : &str) -> Result<f64, String> {
 
 ///
 /// this will convert tokens : [..number(5)operator(+)number(5)..] to tokens : [..number(10)..]
-fn eval_add(eval_state : EvalState) -> Result<f64, String> {
+fn eval_opp(eval_state : EvalState) -> Result<f64, String> {
     
     //note :  this would read on the index of the operator
 
@@ -152,9 +154,17 @@ fn eval_add(eval_state : EvalState) -> Result<f64, String> {
 
     let tokens = &eval_state.tokens[eval_state.index - 1..eval_state.index + 1];
     
-    
+    let first_num = if let Some(number) = tokens.get(0) {
+        number
+    } else {
+        return Err("error : eval_add : expected number on the left side of the addition operator".to_string())
+    };
 
-
+    if let Some(number) = tokens.get(0) {
+        number
+    } else {
+        return Err("error : eval_add : expected number on the left side of the addition operator".to_string())
+    };
 
 
     Ok(0.0)
