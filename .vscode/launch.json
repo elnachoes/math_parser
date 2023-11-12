@@ -5,8 +5,20 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "WindowsVC",
             "preLaunchTask": "rust: cargo build",
-            "name": "(gdb) Launch",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/target/debug/math_parser.exe",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${fileDirname}",
+            "environment": [],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "LinuxGDB",
+            "preLaunchTask": "rust: cargo build",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/target/debug/math_parser",
