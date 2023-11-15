@@ -1,9 +1,3 @@
-// use std::iter::Enumerate;
-// use std::str::Chars;
-// use itertools::{self, Itertools};
-
-use core::num;
-
 #[derive(Clone, Copy, Debug)]
 enum Token {
     Number(f64),
@@ -69,11 +63,15 @@ fn parse(parse_state : ParseState<'_>) -> Result<Vec<Token>, String> {
 }
 
 fn parse_char_token(parse_state : ParseState<'_>) -> Result<ParseState, String> {
-    let success = |token| Ok(ParseState {
-        index : parse_state.index + 1,
-        input : parse_state.input,
-        tokens : [parse_state.tokens.as_slice(), &[token]].concat()
-    });
+    let success = |token| {
+        let mut tokens = parse_state.tokens;
+        tokens.push(token);
+        Ok(ParseState {
+            index : parse_state.index + 1,
+            input : parse_state.input,
+            tokens : tokens
+        })
+    };
 
     let fail = |message| Err(message);
 
@@ -114,63 +112,17 @@ fn parse_number_token(parse_state : ParseState<'_>) -> Result<ParseState, String
         return Err("error : parse_number : float parse error".to_string())
     }
 
+    // create a new tokens list
+    let mut tokens = parse_state.tokens;
+    tokens.push(Token::Number(f64_parse_result.unwrap()));
+
     Ok(ParseState { 
         index: end_number_index, 
         input: parse_state.input, 
-        tokens: [parse_state.tokens.as_slice(), &[Token::Number(f64_parse_result.unwrap())]].concat()
+        tokens: tokens
     })
-}
-
-struct EvalState {
-    pub index : usize,
-    pub tokens : Vec<Token>
-}
-
-fn eval_str(input : &str) -> Result<f64, String> {
-    let tokens_result = parse_str(input);
-
-    if let Err(err) = tokens_result {
-        return Err(err)
-    };
-
-    let eval_state = EvalState {
-        index : 0,
-        tokens : tokens_result.unwrap()
-    };
-    
-    Err("eval".to_string())
-}
-
-///
-/// this will convert tokens : [..number(5)operator(+)number(5)..] to tokens : [..number(10)..]
-fn eval_opp(eval_state : EvalState) -> Result<f64, String> {
-    
-    //note :  this would read on the index of the operator
-
-    // if the '+' is at the front or end of the list of tokens then it is an error
-    if eval_state.index + 1 == eval_state.tokens.len() || eval_state.index == 0{
-        return Err("error : expected number but found end of string".to_string())
-    }
-
-    let tokens = &eval_state.tokens[eval_state.index - 1..eval_state.index + 1];
-    
-    let first_num = if let Some(number) = tokens.get(0) {
-        number
-    } else {
-        return Err("error : eval_add : expected number on the left side of the addition operator".to_string())
-    };
-
-    if let Some(number) = tokens.get(0) {
-        number
-    } else {
-        return Err("error : eval_add : expected number on the left side of the addition operator".to_string())
-    };
-
-
-    Ok(0.0)
 }
 
 fn main() {
     println!("{:?}", parse_str("25 ^ (6*5)"));
 }
-
