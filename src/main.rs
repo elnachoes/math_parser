@@ -22,11 +22,11 @@ struct ParseState<'a> {
     pub tokens: Vec<Token>,
 }
 impl ParseState<'_> {
-    pub fn push_token(self, token : Token, token_char_count : usize) -> Self {
+    pub fn push_token(self, token : Token, index_advance_amount : usize) -> Self {
         let mut tokens = self.tokens;
         tokens.push(token);
         Self {
-            index : self.index + token_char_count,
+            index : self.index + index_advance_amount,
             input : self.input,
             tokens : tokens
         }
@@ -60,7 +60,7 @@ fn parse(parse_state: ParseState<'_>) -> Result<Vec<Token>, String> {
         Ok(parse_state) => parse_control(parse_state),
         Err((_, parse_state)) => match parse_number_token(parse_state) {
             Ok(parse_state) => parse_control(parse_state),
-            Err(_) => Err("parse : error".to_string())
+            Err((error, _)) => return Err(error)
         }
     }
 }
@@ -104,7 +104,9 @@ fn parse_number_token(parse_state: ParseState) -> Result<ParseState, (String, Pa
         return Err(("error : parse_number : float parse error".to_string(), parse_state));
     }
 
-    Ok(parse_state.push_token(Token::Number(f64_parse_result.unwrap()), end_number_index))
+    let index_advance_amount = end_number_index - parse_state.index;
+
+    Ok(parse_state.push_token(Token::Number(f64_parse_result.unwrap()), index_advance_amount))
 }
 
 fn eval_str(input : &str) -> Result<f64, String> {
@@ -113,9 +115,6 @@ fn eval_str(input : &str) -> Result<f64, String> {
     } else {
         return Err("error : eval_str : could not parse tokens".to_string())
     };
-
-    
-
 
     Ok(0.)
 }
@@ -150,5 +149,5 @@ fn main() {
     //     Err(error) => println!("{error:?}")
     // }
 
-    println!("{:?}", parse_str("33 * 4 ^ 900"));
+    println!("{:?}", parse_str("33 * 4"));
 }
