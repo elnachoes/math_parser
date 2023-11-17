@@ -17,112 +17,138 @@ enum Operator {
 
 #[derive(Clone, Debug)]
 struct ParseState<'a> {
-    pub index : usize,
-    pub input : &'a str,
-    pub tokens : Vec<Token>
+    pub index: usize,
+    pub input: &'a str,
+    pub tokens: Vec<Token>,
+}
+impl ParseState<'_> {
+    pub fn push_token(self, token : Token, token_char_count : usize) -> Self {
+        let mut tokens = self.tokens;
+        tokens.push(token);
+        Self {
+            index : self.index + token_char_count,
+            input : self.input,
+            tokens : tokens
+        }
+    }
 }
 
-fn parse_str(input : &str) -> Result<Vec<Token>, String> {
+fn parse_str(input: &str) -> Result<Vec<Token>, String> {
     let cleaned_input = input.to_string().replace(" ", "");
     let parse_state = ParseState {
-        index : 0,
-        input : &cleaned_input,
-        tokens : vec![]
+        index: 0,
+        input: &cleaned_input,
+        tokens: vec![],
     };
 
     match parse(parse_state) {
         Ok(tokens) => Ok(tokens),
-        Err(err) => Err(err)
+        Err(err) => Err(err),
     }
 }
 
-fn parse(parse_state : ParseState<'_>) -> Result<Vec<Token>, String> {
-    let parse_state_copy = || ParseState {
-        index  : parse_state.index,
-        input : parse_state.input,
-        tokens : parse_state.tokens.as_slice().to_vec()
-    }; 
-
-    let parse_control = |parse_state : ParseState<'_>| {
+fn parse(parse_state: ParseState<'_>) -> Result<Vec<Token>, String> {
+    let parse_control = |parse_state: ParseState<'_>| {
         if parse_state.index == parse_state.input.len() {
-            return Ok(parse_state.tokens)
+            return Ok(parse_state.tokens);
         } else {
-            return parse(parse_state)
+            return parse(parse_state);
         }
     };
 
-    if let Ok(parse_state) = parse_char_token(parse_state_copy()) {
-        return parse_control(parse_state);
+    match parse_char_token(parse_state) {
+        Ok(parse_state) => parse_control(parse_state),
+        Err((_, parse_state)) => match parse_number_token(parse_state) {
+            Ok(parse_state) => parse_control(parse_state),
+            Err(_) => Err("parse : error".to_string())
+        }
     }
-
-    if let Ok(parse_state) = parse_number_token(parse_state_copy()) {
-        return parse_control(parse_state);
-    }
-
-    Err("error : parse : could not parse ".to_string())
 }
 
-fn parse_char_token(parse_state : ParseState<'_>) -> Result<ParseState, String> {
-    let success = |token| {
-        let mut tokens = parse_state.tokens;
-        tokens.push(token);
-        Ok(ParseState {
-            index : parse_state.index + 1,
-            input : parse_state.input,
-            tokens : tokens
-        })
-    };
-
-    let fail = |message| Err(message);
-
+fn parse_char_token(parse_state : ParseState<'_>) -> Result<ParseState, (String, ParseState)> {
     let char_to_parse = parse_state.input.chars().nth(parse_state.index);
 
-    if let None =  char_to_parse {
-        return fail("error : parse_operator : nothing to parse out of characters".to_string())
-    }
+    let Some(char_to_parse) = char_to_parse else {
+        return Err(("error : parse_operator : nothing to parse out of characters".to_string(), parse_state));
+    };
 
-    match char_to_parse.unwrap() {
-        '+' => success(Token::Operator(Operator::Addition)),
-        '-' => success(Token::Operator(Operator::Subtraction)),
-        '*' => success(Token::Operator(Operator::Multiplication)),
-        '/' => success(Token::Operator(Operator::Division)),
-        '^' => success(Token::Operator(Operator::Exponentiation)),
+    let token = match char_to_parse {
+        '+' => Token::Operator(Operator::Addition),
+        '-' => Token::Operator(Operator::Subtraction),
+        '*' => Token::Operator(Operator::Multiplication),
+        '/' => Token::Operator(Operator::Division),
+        '^' => Token::Operator(Operator::Exponentiation),
 
-        '(' => success(Token::OpenParen),
-        ')' => success(Token::CloseParen),
-        _ => fail("error : parse_operator : unable to parse operator from char".to_string())
-    }
+        '(' => Token::OpenParen,
+        ')' => Token::CloseParen,
+        _ => return Err(("error : parse_operator : nothing to parse out of characters".to_string(), parse_state))
+    };
+
+    // advance one for char size
+    Ok(parse_state.push_token(token, 1))
 }
 
-fn parse_number_token(parse_state : ParseState<'_>) -> Result<ParseState, String> {
+fn parse_number_token(parse_state: ParseState) -> Result<ParseState, (String, ParseState)> {
     let mut end_number_index = parse_state.index;
     for ch in parse_state.input[parse_state.index..].chars() {
         if ch.is_numeric() || ch == '.' {
             end_number_index += 1
         } else {
-            break
+            break;
         }
     }
 
-    let f64_parse_result = parse_state
-        .input[parse_state.index..end_number_index]
-        .parse::<f64>();
-    
+    let f64_parse_result = parse_state.input[parse_state.index..end_number_index].parse::<f64>();
+
     if let Err(_error) = f64_parse_result {
-        return Err("error : parse_number : float parse error".to_string())
+        return Err(("error : parse_number : float parse error".to_string(), parse_state));
     }
 
-    // create a new tokens list
-    let mut tokens = parse_state.tokens;
-    tokens.push(Token::Number(f64_parse_result.unwrap()));
-
-    Ok(ParseState { 
-        index: end_number_index, 
-        input: parse_state.input, 
-        tokens: tokens
-    })
+    Ok(parse_state.push_token(Token::Number(f64_parse_result.unwrap()), end_number_index))
 }
 
+fn eval_str(input : &str) -> Result<f64, String> {
+    let tokens = if let Ok(tokens) = parse_str(input) {
+        tokens
+    } else {
+        return Err("error : eval_str : could not parse tokens".to_string())
+    };
+
+    
+
+
+    Ok(0.)
+}
+
+fn eval(tokens : &Vec<Token>, index : usize) -> f64 {
+    if tokens.len() == 0 { return 0.0 }
+
+    // if let token = tokens[index]
+    
+    0.
+}
+
+// fn eval_sub_expressions(tokens : &Vec<Token>, index : usize) -> f64 {
+
+//     0.0
+// }
+
+// fn 
+
+
+
 fn main() {
-    println!("{:?}", parse_str("25 ^ (6*5)"));
+
+    // let parse_state = ParseState {
+    //     index : 1,
+    //     input : "6",
+    //     tokens : vec![Token::Number(6.)]
+    // };
+
+    // match parse_char_token(parse_state) {
+    //     Ok(parse_state) => println!("{parse_state:?}"),
+    //     Err(error) => println!("{error:?}")
+    // }
+
+    println!("{:?}", parse_str("33 * 4 ^ 900"));
 }
