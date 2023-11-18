@@ -1,5 +1,5 @@
 use std::default;
-use core::ops::Range;
+use core::{ops::Range, num};
 // use std
 
 #[derive(Clone, Copy, Debug)]
@@ -8,6 +8,15 @@ enum Token {
     Operator(Operator),
     OpenParen,
     CloseParen,
+}
+impl Token {
+    pub fn to_f64(&self) -> Option<f64> {
+        if let Token::Number(num) = self { Some(*num) } else { None }
+    }
+        
+    pub fn is_num(&self) -> bool {
+        if let Self::Number(_) = self { true } else { false }
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -151,6 +160,7 @@ impl EvalState {
             tokens : tokens,            
         }
     }
+
 }
 
 
@@ -189,9 +199,24 @@ fn eval_add_sub(eval_state : EvalState) -> Result<EvalState, String> {
 }
 
 fn operation(num_1 : &Token, op : &Token, num_2 : &Token) -> Result<f64, String> {
-    match op {
+    if !num_1.is_num() || !num_2.is_num() {
+        return Err("error : operation : there are 2 numbers in a rows".to_string());
+    }
 
-        _ => Err("error : operation : operator fail".to_string())
+    let f64_1 = num_1.to_f64().unwrap();
+    let f64_2 = num_2.to_f64().unwrap();
+
+    if let Token::Operator(op) = op {
+        let result = match op  {
+            Operator::Addition => f64_1 + f64_2,
+            Operator::Subtraction => f64_1 - f64_2,
+            Operator::Multiplication => f64_1 * f64_2,
+            Operator::Division => f64_1 / f64_2,
+            Operator::Exponentiation => f64_1.powf(f64_2),
+        };
+        Ok(result)
+    } else {
+        Err("error : operation : expected operator".to_string())
     }
 }
 
