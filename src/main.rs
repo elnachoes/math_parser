@@ -27,7 +27,7 @@ impl Token {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Operator {
     Addition,
     Subtraction,
@@ -158,6 +158,10 @@ impl EvalState {
         }
     }
 
+    pub fn set_index(self, new_index : usize) -> Self {
+        Self { index: new_index, tokens: self.tokens }
+    }
+
     // this will reduce 2 number tokens and an operator token to 1 number 
     // the number token that will replace the 3 tokens will be a result of the math operation specified by the operator
     pub fn apply_operation_to_number_at_index(self) -> Result<Self, String> {
@@ -189,108 +193,37 @@ impl EvalState {
     }
 }
 
-// ---- todo : cleanup these functions dude ----
+/// this will evaluate all given operators for an eval_state
+fn eval_operators(eval_state : EvalState, operators : &[Operator]) -> Result<EvalState, String> {
+    let num_1_token_option = eval_state.tokens.get(eval_state.index);
+    let operator_token_option = eval_state.tokens.get(eval_state.index + 1);
+    let num_2_token_option = eval_state.tokens.get(eval_state.index + 2);
 
+    if num_1_token_option.is_some() && operator_token_option.is_some() {
+        let operator_token = operator_token_option.unwrap();
+        let operator = if let Some(operator) = operator_token.get_operator() { operator } else {
+            panic!("error : eval_operators")
+        };
 
-// 1 + 2 - 4 + 5 
-//     3 - 4 + 5   
-//        -1 + 5 
-//             4
-fn eval_add_sub(eval_state : EvalState) -> Result<EvalState, String> {
-    let first_num = eval_state.tokens.get(eval_state.index);
-    let operator = eval_state.tokens.get(eval_state.index + 1);
-    let second_num = eval_state.tokens.get(eval_state.index + 2);
-    
-    // 1 
-    // or
-    // 1 + 2 + 3 ...
-    // not
-    // 1 +  
-
-    if first_num.is_some() && operator.is_some() {
-        match *operator.unwrap().get_operator().unwrap() {
-            Operator::Addition | Operator::Subtraction => {
-                if second_num.is_none() {
-                    panic!("error :  eval_add_sub")
-                }
-                eval_add_sub(eval_state.apply_operation_to_number_at_index().unwrap())
-            },
-            Operator::CloseParen => Ok(eval_state),
-            _ => eval_add_sub(EvalState { index: eval_state.index + 2, tokens: eval_state.tokens })
+        if let Operator::CloseParen = operator {
+            return Ok(eval_state);
         }
 
-    } else if first_num.is_some() && operator.is_none(){
-        Ok(eval_state)
-        // println!("{:?}", eval_state.tokens);
-    } else {
-        panic!("error : eval_add_sub : could not add");
-    }
-}
-
-fn eval_mult_div(eval_state : EvalState) -> Result<EvalState, String> {
-    let first_num = eval_state.tokens.get(eval_state.index);
-    let operator = eval_state.tokens.get(eval_state.index + 1);
-    let second_num = eval_state.tokens.get(eval_state.index + 2);
-    
-    // 1 
-    // or
-    // 1 + 2 + 3 ...
-    // not
-    // 1 +  
-
-    if first_num.is_some() && operator.is_some() {
-        match *operator.unwrap().get_operator().unwrap() {
-            Operator::Multiplication | Operator::Division => {
-                if second_num.is_none() {
-                    panic!("error :  eval_add_sub")
-                }
-                eval_mult_div(eval_state.apply_operation_to_number_at_index().unwrap())
-            },
-            Operator::CloseParen => Ok(eval_state),
-            _ => eval_mult_div(EvalState { index: eval_state.index + 2, tokens: eval_state.tokens })
+        if num_1_token_option.is_none() || num_2_token_option.is_none() {
+            panic!("error : eval_operators")
         }
 
-    } else if first_num.is_some() && operator.is_none(){
+        if operators.contains(operator) {
+            eval_operators(eval_state.apply_operation_to_number_at_index().unwrap(), operators)
+        } else {
+            eval_operators(EvalState { index: eval_state.index + 2, tokens: eval_state.tokens }, operators)
+        }
+    } else if num_1_token_option.is_some() && operator_token_option.is_none(){
         Ok(eval_state)
     } else {
         panic!("error : eval_add_sub : could not add");
     }
 }
-
-fn eval_exp(eval_state : EvalState) -> Result<EvalState, String> {
-    let first_num = eval_state.tokens.get(eval_state.index);
-    let operator = eval_state.tokens.get(eval_state.index + 1);
-    let second_num = eval_state.tokens.get(eval_state.index + 2);
-    
-    // 1 
-    // or
-    // 1 + 2 + 3 ...
-    // not
-    // 1 +  
-
-    if first_num.is_some() && operator.is_some() {
-        match *operator.unwrap().get_operator().unwrap() {
-            Operator::Exponentiation => {
-                if second_num.is_none() {
-                    panic!("error :  eval_add_sub")
-                }
-                eval_exp(eval_state.apply_operation_to_number_at_index().unwrap())
-            },
-            Operator::CloseParen => Ok(eval_state),
-            _ => eval_exp(EvalState { index: eval_state.index + 2, tokens: eval_state.tokens })
-        }
-
-    } else if first_num.is_some() && operator.is_none(){
-        Ok(eval_state)
-    } else {
-        panic!("error : eval_add_sub : could not add");
-    }
-}
-
-// 
-
-// fn eval_mult_div(eval_state : EvalState)
-
 
 // DONT WORRY ABOUT PARENS FOR NOW
 // fn eval(eval_state : EvalState) -> Result<EvalState, String> {
@@ -298,7 +231,7 @@ fn eval_exp(eval_state : EvalState) -> Result<EvalState, String> {
 //     if eval_state.tokens.len() == 0 { return Ok(eval_state) }
     
 //     // exp
-//     let exp =
+//     // let  = eval_exp(eval_state)
 
 //     // mult/div
 
@@ -337,17 +270,26 @@ fn operation(num_1 : &Token, op : &Token, num_2 : &Token) -> Result<f64, String>
 fn main() {
 
     // println!("{:?}", parse_str("5 +     5 - 9 * (2^(3/5))"))
-    let eval_state = EvalState { index: 0, tokens: parse_str("5  * 5 + 1 - 4 / 7").unwrap() };
+    let eval_state = EvalState { index: 0, tokens: parse_str("3^3 * 5  * 5 + 1 - 4 / 7").unwrap() };
 
 
-    let after_mult_div = eval_mult_div(eval_state);
+    // let after_mult_div = eval_mult_div(eval_state);
+    // println!("{:?}", after_mult_div);
+
+    // let new_eval_state = EvalState {
+    //     index : 0,
+    //     tokens : after_mult_div.unwrap().tokens
+    // };
+
+    // let after_add_sub = eval_add_sub(new_eval_state);
+    // println!("{:?}", after_add_sub);
+
+    let after_exp = eval_operators(eval_state, &[Operator::Exponentiation]);
+    println!("{:?}", after_exp);
+
+    let after_mult_div = eval_operators(after_exp.unwrap().set_index(0), &[Operator::Multiplication, Operator::Division]);
     println!("{:?}", after_mult_div);
 
-    let new_eval_state = EvalState {
-        index : 0,
-        tokens : after_mult_div.unwrap().tokens
-    };
-
-    let after_add_sub = eval_add_sub(new_eval_state);
+    let after_add_sub = eval_operators(after_mult_div.unwrap().set_index(0), &[Operator::Addition, Operator::Subtraction]);
     println!("{:?}", after_add_sub);
 }
