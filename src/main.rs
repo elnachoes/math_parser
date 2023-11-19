@@ -1,13 +1,13 @@
-use std::default;
-use core::{ops::Range, num};
+use std::{default, f32::consts::E};
+use core::{ops::Range, num, panic};
 // use std
 
 #[derive(Clone, Copy, Debug)]
 enum Token {
     Number(f64),
     Operator(Operator),
-    OpenParen,
-    CloseParen,
+    // OpenParen,
+    // CloseParen,
 }
 impl Token {
     pub fn to_f64(&self) -> Option<f64> {
@@ -16,6 +16,14 @@ impl Token {
         
     pub fn is_num(&self) -> bool {
         if let Self::Number(_) = self { true } else { false }
+    }
+
+    pub fn get_operator(&self) -> Option<&Operator> {
+        if let Self::Operator(operator) = self { Some(operator) } else { None }
+    }
+
+    pub fn is_close_paren(&self) -> bool {
+        if let Self::Operator(operator) = self { if let Operator::CloseParen = operator { true } else { false } } else { false }
     }
 }
 
@@ -26,6 +34,8 @@ enum Operator {
     Multiplication,
     Division,
     Exponentiation,
+    OpenParen,
+    CloseParen,
 }
 
 #[derive(Clone, Debug)]
@@ -95,9 +105,8 @@ fn parse_char_token(parse_state : ParseState<'_>) -> Result<ParseState, (String,
         '*' => Token::Operator(Operator::Multiplication),
         '/' => Token::Operator(Operator::Division),
         '^' => Token::Operator(Operator::Exponentiation),
-
-        '(' => Token::OpenParen,
-        ')' => Token::CloseParen,
+        '(' => Token::Operator(Operator::OpenParen),
+        ')' => Token::Operator(Operator::CloseParen),
         _ => return Err(("error : parse_operator : could not parse char".to_string(), parse_state))
     };
 
@@ -132,9 +141,6 @@ fn eval_str(input : &str) -> Result<f64, String> {
     } else {
         return Err("error : eval_str : could not parse tokens".to_string())
     };
-    
-
-
 
     Ok(0.)
 }
@@ -152,55 +158,161 @@ impl EvalState {
         }
     }
 
-    pub fn reduce_range(self, range : Range<usize>, token : Token) -> Self {
+    // this will reduce 2 number tokens and an operator token to 1 number 
+    // the number token that will replace the 3 tokens will be a result of the math operation specified by the operator
+    pub fn apply_operation_to_number_at_index(self) -> Result<Self, String> {
         let mut tokens = self.tokens;
-        tokens[range].swap_with_slice(&mut [token]);
-        Self {
-            index : self.index,
-            tokens : tokens,            
+        let expression_index = self.index;
+        let first_num = tokens.get(self.index);
+        let operator = tokens.get(self.index + 1);
+        let second_num = tokens.get(self.index + 2); 
+        
+        // swap the begining of the range passed in
+        if first_num.is_some() && operator.is_some() && second_num.is_some() {
+            let result_number_token = if let Ok(num) = operation(first_num.unwrap(), operator.unwrap(), second_num.unwrap()) {
+                Token::Number(num)
+            } else {
+                panic!("error")
+            };
+
+            // drain 3 then insert
+            tokens.drain(expression_index..=expression_index + 2);
+            tokens.insert(expression_index, result_number_token);
+            
+            Ok(Self {
+                index : self.index,
+                tokens : tokens,            
+            })
+        } else {
+            panic!("error : apply_operation_to_number_at_index : could not apply operation")
         }
     }
-
 }
+
+// ---- todo : cleanup these functions dude ----
+
+
+// 1 + 2 - 4 + 5 
+//     3 - 4 + 5   
+//        -1 + 5 
+//             4
+fn eval_add_sub(eval_state : EvalState) -> Result<EvalState, String> {
+    let first_num = eval_state.tokens.get(eval_state.index);
+    let operator = eval_state.tokens.get(eval_state.index + 1);
+    let second_num = eval_state.tokens.get(eval_state.index + 2);
+    
+    // 1 
+    // or
+    // 1 + 2 + 3 ...
+    // not
+    // 1 +  
+
+    if first_num.is_some() && operator.is_some() {
+        match *operator.unwrap().get_operator().unwrap() {
+            Operator::Addition | Operator::Subtraction => {
+                if second_num.is_none() {
+                    panic!("error :  eval_add_sub")
+                }
+                eval_add_sub(eval_state.apply_operation_to_number_at_index().unwrap())
+            },
+            Operator::CloseParen => Ok(eval_state),
+            _ => eval_add_sub(EvalState { index: eval_state.index + 2, tokens: eval_state.tokens })
+        }
+
+    } else if first_num.is_some() && operator.is_none(){
+        Ok(eval_state)
+        // println!("{:?}", eval_state.tokens);
+    } else {
+        panic!("error : eval_add_sub : could not add");
+    }
+}
+
+fn eval_mult_div(eval_state : EvalState) -> Result<EvalState, String> {
+    let first_num = eval_state.tokens.get(eval_state.index);
+    let operator = eval_state.tokens.get(eval_state.index + 1);
+    let second_num = eval_state.tokens.get(eval_state.index + 2);
+    
+    // 1 
+    // or
+    // 1 + 2 + 3 ...
+    // not
+    // 1 +  
+
+    if first_num.is_some() && operator.is_some() {
+        match *operator.unwrap().get_operator().unwrap() {
+            Operator::Multiplication | Operator::Division => {
+                if second_num.is_none() {
+                    panic!("error :  eval_add_sub")
+                }
+                eval_mult_div(eval_state.apply_operation_to_number_at_index().unwrap())
+            },
+            Operator::CloseParen => Ok(eval_state),
+            _ => eval_mult_div(EvalState { index: eval_state.index + 2, tokens: eval_state.tokens })
+        }
+
+    } else if first_num.is_some() && operator.is_none(){
+        Ok(eval_state)
+    } else {
+        panic!("error : eval_add_sub : could not add");
+    }
+}
+
+fn eval_exp(eval_state : EvalState) -> Result<EvalState, String> {
+    let first_num = eval_state.tokens.get(eval_state.index);
+    let operator = eval_state.tokens.get(eval_state.index + 1);
+    let second_num = eval_state.tokens.get(eval_state.index + 2);
+    
+    // 1 
+    // or
+    // 1 + 2 + 3 ...
+    // not
+    // 1 +  
+
+    if first_num.is_some() && operator.is_some() {
+        match *operator.unwrap().get_operator().unwrap() {
+            Operator::Exponentiation => {
+                if second_num.is_none() {
+                    panic!("error :  eval_add_sub")
+                }
+                eval_exp(eval_state.apply_operation_to_number_at_index().unwrap())
+            },
+            Operator::CloseParen => Ok(eval_state),
+            _ => eval_exp(EvalState { index: eval_state.index + 2, tokens: eval_state.tokens })
+        }
+
+    } else if first_num.is_some() && operator.is_none(){
+        Ok(eval_state)
+    } else {
+        panic!("error : eval_add_sub : could not add");
+    }
+}
+
+// 
+
+// fn eval_mult_div(eval_state : EvalState)
 
 
 // DONT WORRY ABOUT PARENS FOR NOW
-fn eval(tokens : Vec<Token>) -> Result<f64, String> {
-    // empty tokens
-    if tokens.len() == 0 { return Ok(0.) }
+// fn eval(eval_state : EvalState) -> Result<EvalState, String> {
+//     // empty tokens
+//     if eval_state.tokens.len() == 0 { return Ok(eval_state) }
     
-    // exp
+//     // exp
+//     let exp =
 
-    // mult/div
+//     // mult/div
 
-    // add/sub
+//     // add/sub
 
     
-    // if let token = tokens[index]
+//     // if let token = tokens[index]
     
-    Ok(0.)
-}
-
-
-fn eval_exponentiation(tokens : Vec<Token>) -> Result<f64, String> {
-    
-
-    Ok(0.)
-}
-
-/// 1 + 2 - 4 + 5 
-///     3 - 4 + 5   
-///        -1 + 5 
-///             4
-fn eval_add_sub(eval_state : EvalState) -> Result<EvalState, String> {
-    // eval_state.tokens
-
-    Ok(eval_state)
-}
+//     Ok(eval_state)
+// }
 
 fn operation(num_1 : &Token, op : &Token, num_2 : &Token) -> Result<f64, String> {
     if !num_1.is_num() || !num_2.is_num() {
-        return Err("error : operation : there are 2 numbers in a rows".to_string());
+        panic!("error : operation")
     }
 
     let f64_1 = num_1.to_f64().unwrap();
@@ -213,14 +325,29 @@ fn operation(num_1 : &Token, op : &Token, num_2 : &Token) -> Result<f64, String>
             Operator::Multiplication => f64_1 * f64_2,
             Operator::Division => f64_1 / f64_2,
             Operator::Exponentiation => f64_1.powf(f64_2),
+            _ => panic!("error : operation")
         };
         Ok(result)
     } else {
-        Err("error : operation : expected operator".to_string())
+        panic!("error : operation")
     }
 }
 
 
 fn main() {
-    println!("{:?}", parse_str("33 * 4 + 66"));
+
+    // println!("{:?}", parse_str("5 +     5 - 9 * (2^(3/5))"))
+    let eval_state = EvalState { index: 0, tokens: parse_str("5  * 5 + 1 - 4 / 7").unwrap() };
+
+
+    let after_mult_div = eval_mult_div(eval_state);
+    println!("{:?}", after_mult_div);
+
+    let new_eval_state = EvalState {
+        index : 0,
+        tokens : after_mult_div.unwrap().tokens
+    };
+
+    let after_add_sub = eval_add_sub(new_eval_state);
+    println!("{:?}", after_add_sub);
 }
