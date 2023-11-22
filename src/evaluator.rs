@@ -157,10 +157,6 @@ fn eval_operators(eval_state : EvalState, operators : &[Operator]) -> Result<Eva
 
 /// this will evaluate all given operators for an eval_state
 fn eval_operators_test(eval_state : EvalState, operators : &[Operator]) -> Result<EvalState, String> {
-    let num_1_token_option = eval_state.tokens.get(eval_state.index);
-    let operator_token_option = eval_state.tokens.get(eval_state.index + 1);
-    let num_2_token_option = eval_state.tokens.get(eval_state.index + 2);
-
     if eval_state.is_solved() { 
         if eval_state.is_paren_num_paren() {
             return eval_state.reduce_paren_num_paren()
@@ -169,38 +165,21 @@ fn eval_operators_test(eval_state : EvalState, operators : &[Operator]) -> Resul
         }
     }
 
-    if num_1_token_option.is_some() && operator_token_option.is_some() {
-        let operator_token = operator_token_option.unwrap();
-        let operator = if let Some(operator) = operator_token.get_operator() { operator } else {
-            // println!("{eval_state:?}");
-            panic!("error : eval_operators")
-        };
-
-        if let Operator::CloseParen = operator {
-            // this is where I need to check and see if 
-            
-            let new_index = eval_state.index - 1;
-            let eval_state = eval_state.set_index(new_index);
-            if eval_state.is_paren_num_paren() {
-                return Ok(eval_state.reduce_paren_num_paren().unwrap())
-            } else {
-                return Ok(eval_state.set_index(new_index))
-            }
+    if let &[Token::Number(num_1), Token::Operator(op)] = &eval_state.tokens[eval_state.index..=eval_state.index+1] {
+        if let Operator::OpenParen = op {
+            return Ok(eval_state)
         }
+        
+        if let Some(Token::Number(num_2)) = eval_state.tokens.get(eval_state.index+2) {
 
-        if num_1_token_option.is_none() || num_2_token_option.is_none() {
-            panic!("error : eval_operators")
-        }
-
-        if operators.contains(operator) {
-            eval_operators(eval_state.reduce_num_op_num().unwrap(), operators)
         } else {
-            eval_operators(EvalState { index: eval_state.index + 2, tokens: eval_state.tokens }, operators)
+
+            Ok(eval_state)
         }
-    } else if num_1_token_option.is_some() && operator_token_option.is_none(){
-        Ok(eval_state)
+
     } else {
-        panic!("error : eval_operators");
+
+        Ok(eval_state)
     }
 }
 
