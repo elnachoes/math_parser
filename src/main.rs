@@ -81,5 +81,5 @@ fn main() {
     // println!("{:?}", &test_eval_state.tokens[9..=12].to_vec());
     // println!("{:?}", x);
 
-    println!("{:?}", eval_str("2^3^4"))
+    println!("{:?}", eval_str("2 * 3 * 4"))
 }
