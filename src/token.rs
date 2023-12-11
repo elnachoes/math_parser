@@ -63,3 +63,15 @@ pub enum Operator {
     OpenParen,
     CloseParen,
 }
+impl Operator {
+    pub fn apply_operation(&self, num1: f64, num2: f64) -> Result<f64, ()> {
+        match self {
+            Self::Addition => Ok(num1 + num2),
+            Self::Subtraction => Ok(num1 - num2),
+            Self::Multiplication => Ok(num1 * num2),
+            Self::Division => Ok(num1 / num2),
+            Self::Exponentiation => Ok(num1.powf(num2)),
+            _ => Err(()),
+        }
+    }
+}

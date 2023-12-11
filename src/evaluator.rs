@@ -1,167 +1,80 @@
-use core::panic;
+use std::ops::RangeInclusive;
 
-// use std
-use crate::{parser::*, token::{*, self}};
+use itertools::Itertools;
 
-pub fn eval_str(input: &str) -> Result<f64, String> {
-    let tokens = if let Ok(tokens) = parse_str(input) {
-        tokens
-    } else {
-        return Err("error : eval_str : could not parse tokens".to_string());
-    };
+use crate::*;
 
-    Ok(eval_expression(&tokens).unwrap())
-}
-
-fn eval_expression(tokens: &[Token]) -> Result<f64, String> {
-    // step 1 : the top level expression needs to get reconstructed from ALL of the sub expressions
-    // this means that each item in the passed in the passarray will get copied into a vec
-
-    // setup the first section of evaluating an expression by copying the expression tokens into a vec for computing the expression
-    let mut top_level_expression_vec = tokens.to_vec();
-
-    // this will construct the top level expression by solving all of the sub expressions
-    while let Some((i, _token)) = top_level_expression_vec.iter().enumerate().find(|(_i, token)| if let Token::Operator(Operator::OpenParen) = token {true} else {false}) {
-        let sub_expression_start_index = i + 1;
-        let sub_expression_end_index = find_expression_end(&top_level_expression_vec, sub_expression_start_index).unwrap();
-        let sub_expression_solution = eval_expression(&top_level_expression_vec[sub_expression_start_index..=sub_expression_end_index]).unwrap();
-
-        top_level_expression_vec.drain(sub_expression_start_index-1..=sub_expression_end_index+1);
-        top_level_expression_vec.insert(sub_expression_start_index-1, Token::Number(sub_expression_solution))
-    }
-
-    // let after_exp = match eval_operators(top_level_expression_vec, 0, &[Operator::Exponentiation], EvalDirection::RightToLeft) {
-    //     EvalOperatorsResult::ReducedOrUnchanged(tokens) => tokens,
-    //     EvalOperatorsResult::Solved(num) => return Ok(num),
-    // };
-
-    // println!("{after_exp:?}");
-    
-    let after_mult_div = match eval_operators(top_level_expression_vec, 0, &[Operator::Multiplication, Operator::Division], EvalDirection::LeftToRight) {
-        EvalOperatorsResult::ReducedOrUnchanged(tokens) => tokens,
-        EvalOperatorsResult::Solved(num) => return Ok(num),
-    };
-    
-    println!("{after_mult_div:?}");
-
-    match eval_operators(after_mult_div, 0, &[Operator::Addition, Operator::Subtraction], EvalDirection::LeftToRight) {
-        EvalOperatorsResult::ReducedOrUnchanged(_) => panic!("error : eval_test"),
-        EvalOperatorsResult::Solved(num) => Ok(num),
-    }
-    // println!("asdf");
-}
-
-
-// TODO WE NEED A GET NEXT OPERAND FUNC
-#[derive(Clone, Copy, PartialEq, Debug)]
-enum EvalDirection {
+pub enum EvalOperatorsDirection {
     LeftToRight,
-    RightToLeft
-}
-impl EvalDirection {
-    pub fn get_next_operand_index(&self, index : usize) -> usize {
-        use EvalDirection::*;
+    RightToLeft,
+} 
+impl EvalOperatorsDirection {
+    pub fn get_adjacent_operand_index(&self, index : usize) -> usize {
         match self {
-            LeftToRight => index.saturating_add(2),
-            RightToLeft => index.saturating_sub(2)
+            Self::LeftToRight => index + 2,
+            Self::RightToLeft => index - 2
         }
     }
 
-    pub fn is_left_to_right(&self) -> bool { if let Self::LeftToRight = self { true } else { false }}
-}
-
-enum EvalOperatorsResult {
-    ReducedOrUnchanged(Vec<Token>),
-    Solved(f64)
-}
-
-/// this will evaluate all given operators for an eval_state
-fn eval_operators(tokens : Vec<Token>, index : usize, operators: &[Operator], eval_direction : EvalDirection) -> EvalOperatorsResult {
-    if let Some(num) = try_get_expression_solution(&tokens) {
-        return EvalOperatorsResult::Solved(num)
-    }
-
-    // println!("first bool : {} && {}", index >= tokens.len(), eval_direction.is_left_to_right());
-    // println!("second bool : {} && {}", index <= 0, !eval_direction.is_left_to_right());
-    if index >= tokens.len() && eval_direction.is_left_to_right() || index <= 0  && !eval_direction.is_left_to_right() {
-        return EvalOperatorsResult::ReducedOrUnchanged(tokens)
-    }
-
-    let next_operand_index = eval_direction.get_next_operand_index(index);
-    let operation_range = if next_operand_index > index { index..=next_operand_index } else { next_operand_index..=index };
-
-    if *operation_range.end() >= tokens.len() || *operation_range.start() > 0 { return EvalOperatorsResult::ReducedOrUnchanged(tokens) }
-
-
-    // let next_operand_index = if let EvalDirection::LeftToRight = eval_direction { index+2 } else { index-2 };
-
-    // if index + 2 >= tokens.len() { return EvalOperatorsResult::ReducedOrUnchanged(tokens) }
-
-    // println!("[{operation_range:?}]:{tokens:?}");
-
-    if let &[Token::Number(_), Token::Operator(op), Token::Number(_)] = &tokens[operation_range.clone()] {
-        if !operators.contains(&op) {
-            return eval_operators(tokens, next_operand_index, operators, eval_direction)
-        }
-        
-        if let Some(Token::Number(_)) = tokens.get(next_operand_index) {
-            // println!("asdf");
-            let new_reduced_tokens = reduce_operation_at_index(tokens, index, eval_direction).unwrap();
-            // println!("these are the new reduced tokens {new_reduced_tokens:?}");
-            return eval_operators(new_reduced_tokens, next_operand_index, operators, eval_direction)
+    pub fn get_operation_range_at_index(&self, index : usize) -> RangeInclusive<usize> {
+        match self {
+            Self::LeftToRight => index..=index+2,
+            Self::RightToLeft => index-2..=index
         }
     }
 
-    EvalOperatorsResult::ReducedOrUnchanged(tokens)
+    pub fn index_at_expression_end(&self, tokens : &Vec<Token>, index : usize) -> bool {
+        match self {
+            Self::LeftToRight => index == tokens.len() - 1,
+            Self::RightToLeft => index == 0 
+        }
+    }
+
+    pub fn get_starting_index(&self, tokens : &Vec<Token>) -> Result<usize, String> {
+        if tokens.len() == 0 { return Err("error : no starting index for token string of length 0".to_string()) }
+        match self {
+            Self::LeftToRight => Ok(0),
+            Self::RightToLeft => Ok(tokens.len() - 1)
+        }
+    }
 }
 
-
-/// this will reduce 2 number tokens and an operator token to 1 number
-/// the number token that will replace the 3 tokens will be a result of the math operation specified by the operator
-fn reduce_operation_at_index(tokens : Vec<Token>, index : usize, eval_direction : EvalDirection) -> Result<Vec<Token>, String> {
+pub fn eval_operators(tokens : Vec<Token>, operators : &[Operator], eval_direction : EvalOperatorsDirection) -> Result<Vec<Token>, String> {
     let mut tokens = tokens;
 
-    let next_operand_index = eval_direction.get_next_operand_index(index);
-    let operation_range = if next_operand_index > index { index..=next_operand_index } else { next_operand_index..=index };
+    let mut index = eval_direction.get_starting_index(&tokens)?;
 
-    // println!("{operation_range:?}");
+    loop {
+        if eval_direction.index_at_expression_end(&tokens, index) || tokens.len() == 1 { break } 
+        
+        let operation_range = eval_direction.get_operation_range_at_index(index);
 
-    // let operation_range = index..=index+2;
-    if let &[Token::Number(num_1), Token::Operator(op), Token::Number(num_2)] = &tokens[operation_range.clone()] {
-        if let Operator::OpenParen | Operator::CloseParen = op {
-            panic!("error : reduce_num_op_num : cannot reduce operation on paren")
-        }
-
-        let operation_result = match op {
-            Operator::Addition => num_1 + num_2,
-            Operator::Subtraction => num_1 - num_2,
-            Operator::Multiplication => num_1 * num_2,
-            Operator::Division => num_1 / num_2,
-            Operator::Exponentiation => num_1.powf(num_2),
-            _ => panic!("error : reduce_operation_at_index")
+        let reduction_option = if let &[Token::Number(left_num), Token::Operator(op), Token::Number(right_num)] = &tokens[operation_range.clone()] {
+            if operators.iter().contains(&op) {
+                op.apply_operation(left_num, right_num)
+            } else {
+                Err(())
+            }
+        } else {
+            Err(())
         };
 
-        tokens.drain(operation_range.clone());
-
-        tokens.insert(index, Token::Number(operation_result));
-        Ok(tokens)
-    } else {
-        panic!("error : reduce_num_op_num")
+        if let Ok(result) = reduction_option {
+            let insertion_index = *operation_range.start();
+            tokens.drain(operation_range.clone());
+            let new_number_token = Token::Number(result);
+            if tokens.len() == 0 { tokens.push(new_number_token) }
+            else { tokens.insert(insertion_index, new_number_token) } 
+            if let EvalOperatorsDirection::RightToLeft = eval_direction { index -=2 }
+        } else {
+            index = eval_direction.get_adjacent_operand_index(index);
+        }
     }
-}
-
-fn is_index_at_expression_edge(tokens : &[Token], index : usize) -> bool {
-    if index == tokens.len() || index == 0 { return true }
-    false
-}
-
-// if an expression is only 1 number token then the expression is solved return the number
-fn try_get_expression_solution(tokens : &[Token]) -> Option<f64> {
-    if let &[Token::Number(num)] = tokens { Some(num) } else { None }
+    Ok(tokens)
 }
 
 // this will find the end of an expression
-fn find_expression_end(tokens : &[Token], expression_start_index : usize) -> Result<usize, String> {
+fn find_expression_end(tokens : &Vec<Token>, expression_start_index : usize) -> Result<usize, String> {
     if expression_start_index >= tokens.len() || tokens.get(expression_start_index).is_none() { return Err("error : find_expression_end".to_string()) }
 
     if expression_start_index == 0 { return Ok(tokens.len() - 1) }
@@ -177,4 +90,46 @@ fn find_expression_end(tokens : &[Token], expression_start_index : usize) -> Res
     }
 
     panic!("error : find_expression_end")
+}
+
+pub fn is_solved_token_string(tokens : &Vec<Token>) -> bool { 
+    if tokens.len() == 1 && tokens.first().is_some_and(|token| if let Token::Number(_) = token {true} else {false}) { 
+        true 
+    } else { 
+        false 
+    }
+}
+
+pub fn eval_expression(tokens : Vec<Token>) -> Result<f64, String> {
+    if is_solved_token_string(&tokens) { return Ok(tokens.first().unwrap().to_f64().unwrap()) }
+
+    let mut sub_expression_solutions : Vec<(Token, RangeInclusive<usize>)> = vec![];
+    for (index, _token) in tokens.iter().enumerate().filter(|(_index, token)| if let Token::Operator(Operator::OpenParen) = token {true} else {false}) {
+        if sub_expression_solutions.iter().any(|(_token, range)| range.contains(&index)) { continue }
+        let pre_calc_start_index = index + 1;
+        let pre_calc_end_index = find_expression_end(&tokens, pre_calc_start_index)?;
+        let sub_expression_result = eval_expression(tokens[pre_calc_start_index..=pre_calc_end_index].to_vec())?;
+        sub_expression_solutions.push((Token::Number(sub_expression_result), index..=pre_calc_end_index+1))
+    }
+
+    let mut after_sub_expressions = tokens;
+    let mut reduction_offset = 0;
+    for (token, range) in sub_expression_solutions {
+        let offset_range = range.start()-reduction_offset..=range.end()-reduction_offset;
+        after_sub_expressions.drain(offset_range.clone());
+        reduction_offset += offset_range.clone().count() - 1;
+        after_sub_expressions.insert(*offset_range.start(), token);
+    }
+    if is_solved_token_string(&after_sub_expressions) { return Ok(after_sub_expressions.first().unwrap().to_f64().unwrap()) }
+
+    let after_exp = eval_operators(after_sub_expressions, &[Operator::Exponentiation], EvalOperatorsDirection::RightToLeft)?;
+    if is_solved_token_string(&after_exp) { return Ok(after_exp.first().unwrap().to_f64().unwrap()) }
+
+    let after_mult_div = eval_operators(after_exp, &[Operator::Multiplication, Operator::Division], EvalOperatorsDirection::LeftToRight)?;
+    if is_solved_token_string(&after_mult_div) { return Ok(after_mult_div.first().unwrap().to_f64().unwrap()) }
+
+    let after_add_sub = eval_operators(after_mult_div, &[Operator::Addition, Operator::Subtraction], EvalOperatorsDirection::LeftToRight)?;
+    if is_solved_token_string(&after_add_sub) { return Ok(after_add_sub.first().unwrap().to_f64().unwrap()) }
+
+    Err("error : unsolved expression : {}".to_string())
 }
