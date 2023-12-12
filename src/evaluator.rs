@@ -6,7 +6,7 @@ use crate::*;
 
 enum EvalOperatorsDirection {
     LeftToRight,
-    Righ,
+    RightToLeft
 }
 impl EvalOperatorsDirection {
     pub fn get_adjacent_operand_index(&self, index: usize) -> usize {
@@ -200,21 +200,12 @@ pub fn eval_expression(tokens: Vec<Token>) -> Result<f64, String> {
         return Ok(after_mult_div.first().unwrap().to_f64().unwrap());
     }
 
-    let after_add_sub = eval_operators(
-        after_mult_div,
-        &[Operator::Addition, Operator::Subtraction],
-        EvalOperatorsDirection::LeftToRight,
-    )?;
+    let after_add_sub = eval_operators(after_mult_div, &[Operator::Addition, Operator::Subtraction], EvalOperatorsDirection::LeftToRight)?;
     if is_solved_token_string(&after_add_sub) {
         return Ok(after_add_sub.first().unwrap().to_f64().unwrap());
     }
 
     Err("error : unsolved expression : {}".to_string())
-}
-
-pub fn eval_str(string: &str) -> Result<f64, String> {
-    let token_string = parse_str(string)?;
-    eval_expression(token_string)
 }
 
 pub fn eval_str(string: &str) -> Result<f64, String> {
