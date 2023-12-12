@@ -53,8 +53,11 @@ fn parse(parse_state: ParseState<'_>) -> Result<Vec<Token>, String> {
 fn parse_char_token(parse_state: ParseState<'_>) -> Result<ParseState, (String, ParseState)> {
     let char_to_parse = parse_state.input.chars().nth(parse_state.index);
 
-    if char_to_parse.is_none() {  
-        return Err(("error : parse_operator : nothing to parse out of characters".to_string(), parse_state));
+    if char_to_parse.is_none() {
+        return Err((
+            "error : parse_operator : nothing to parse out of characters".to_string(),
+            parse_state,
+        ));
     }
 
     let token = match char_to_parse.unwrap() {
@@ -65,7 +68,12 @@ fn parse_char_token(parse_state: ParseState<'_>) -> Result<ParseState, (String, 
         '^' => Token::Operator(Operator::Exponentiation),
         '(' => Token::Operator(Operator::OpenParen),
         ')' => Token::Operator(Operator::CloseParen),
-        _ => return Err(("error : parse_operator : could not parse char".to_string(), parse_state))
+        _ => {
+            return Err((
+                "error : parse_operator : could not parse char".to_string(),
+                parse_state,
+            ))
+        }
     };
 
     // advance one for char size
@@ -85,10 +93,16 @@ fn parse_number_token(parse_state: ParseState) -> Result<ParseState, (String, Pa
     let f64_parse_result = parse_state.input[parse_state.index..end_number_index].parse::<f64>();
 
     if f64_parse_result.is_err() {
-        return Err(("error : parse_number : float parse error".to_string(), parse_state));
+        return Err((
+            "error : parse_number : float parse error".to_string(),
+            parse_state,
+        ));
     }
 
     let index_advance_amount = end_number_index - parse_state.index;
 
-    Ok(parse_state.push_token(Token::Number(f64_parse_result.unwrap()), index_advance_amount))
+    Ok(parse_state.push_token(
+        Token::Number(f64_parse_result.unwrap()),
+        index_advance_amount,
+    ))
 }
