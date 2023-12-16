@@ -34,7 +34,7 @@ pub fn parse_str(input: &str) -> Result<Vec<Token>, String> {
 
 fn parse(parse_state: ParseState<'_>) -> Result<Vec<Token>, String> {
     let parse_control = |parse_state: ParseState<'_>| {
-        if parse_state.index == parse_state.input.len() {
+        if parse_state.index >= parse_state.input.len() {
             Ok(parse_state.tokens)
         } else {
             parse(parse_state)

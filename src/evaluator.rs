@@ -113,11 +113,17 @@ fn find_sub_expression_end(tokens: &Vec<Token>, expression_start_index: usize) -
 
 /// this will check if a token string is solved. if there is only one number token left in the token string the expression is solved.
 fn is_solved_token_string(tokens: &Vec<Token>) -> bool {
-    if tokens.len() == 1 && tokens.first().is_some_and(|token| { if let Token::Number(_) = token { true } else { false } }) {
+    if tokens.len() == 1&& tokens.first().is_some_and(|token| { if let Token::Number(_) = token { true } else { false } }) {
         true
     } else {
         false
     }
+}
+
+/// this will evaluate a string math expression
+pub fn eval_str(string: &str) -> Result<f64, String> {
+    let token_string = parse_str(string)?;
+    eval_expression(token_string)
 }
 
 /// this will evaluate a token string expresssion recursively.
@@ -168,9 +174,4 @@ pub fn eval_expression(tokens: Vec<Token>) -> Result<f64, String> {
     }
 
     Err("error : unsolved expression : {}".to_string())
-}
-
-pub fn eval_str(string: &str) -> Result<f64, String> {
-    let token_string = parse_str(string)?;
-    eval_expression(token_string)
 }
