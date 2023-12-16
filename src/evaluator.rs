@@ -6,7 +6,7 @@ use crate::*;
 
 enum EvalOperatorsDirection {
     LeftToRight,
-    RightToLeft
+    RightToLeft,
 }
 impl EvalOperatorsDirection {
     pub fn get_adjacent_operand_index(&self, index: usize) -> usize {
@@ -41,11 +41,7 @@ impl EvalOperatorsDirection {
     }
 }
 
-fn eval_operators(
-    tokens: Vec<Token>,
-    operators: &[Operator],
-    eval_direction: EvalOperatorsDirection,
-) -> Result<Vec<Token>, String> {
+fn eval_operators(tokens: Vec<Token>,operators: &[Operator], eval_direction: EvalOperatorsDirection) -> Result<Vec<Token>, String> {
     let mut tokens = tokens;
 
     let mut index = eval_direction.get_starting_index(&tokens)?;
@@ -57,9 +53,7 @@ fn eval_operators(
 
         let operation_range = eval_direction.get_operation_range_at_index(index);
 
-        let reduction_option = if let &[Token::Number(left_num), Token::Operator(op), Token::Number(right_num)] =
-            &tokens[operation_range.clone()]
-        {
+        let reduction_option = if let &[Token::Number(left_num), Token::Operator(op), Token::Number(right_num)] = &tokens[operation_range.clone()] {
             if operators.iter().contains(&op) {
                 op.apply_operation(left_num, right_num)
             } else {
@@ -89,10 +83,7 @@ fn eval_operators(
 }
 
 /// this will find the end of a sub expression by itterating through the token string and finding where the scope is enclosed.
-fn find_sub_expression_end(
-    tokens: &Vec<Token>,
-    expression_start_index: usize,
-) -> Result<usize, String> {
+fn find_sub_expression_end(tokens: &Vec<Token>, expression_start_index: usize) -> Result<usize, String> {
     if expression_start_index >= tokens.len() || tokens.get(expression_start_index).is_none() {
         return Err("error : find_expression_end".to_string());
     }
@@ -122,15 +113,7 @@ fn find_sub_expression_end(
 
 /// this will check if a token string is solved. if there is only one number token left in the token string the expression is solved.
 fn is_solved_token_string(tokens: &Vec<Token>) -> bool {
-    if tokens.len() == 1
-        && tokens.first().is_some_and(|token| {
-            if let Token::Number(_) = token {
-                true
-            } else {
-                false
-            }
-        })
-    {
+    if tokens.len() == 1 && tokens.first().is_some_and(|token| { if let Token::Number(_) = token { true } else { false } }) {
         true
     } else {
         false
@@ -146,27 +129,14 @@ pub fn eval_expression(tokens: Vec<Token>) -> Result<f64, String> {
 
     // find each sub expression and store a list of the answer and range of tokens they will replace.
     let mut sub_expression_solutions: Vec<(Token, RangeInclusive<usize>)> = vec![];
-    for (index, _token) in tokens.iter().enumerate().filter(|(_index, token)| {
-        if let Token::Operator(Operator::OpenParen) = token {
-            true
-        } else {
-            false
-        }
-    }) {
-        if sub_expression_solutions
-            .iter()
-            .any(|(_token, range)| range.contains(&index))
-        {
+    for (index, _token) in tokens.iter().enumerate().filter(|(_index, token)| { if let Token::Operator(Operator::OpenParen) = token { true } else { false } }) {
+        if sub_expression_solutions.iter().any(|(_token, range)| range.contains(&index)) {
             continue;
         }
         let pre_calc_start_index = index + 1;
         let pre_calc_end_index = find_sub_expression_end(&tokens, pre_calc_start_index)?;
-        let sub_expression_result =
-            eval_expression(tokens[pre_calc_start_index..=pre_calc_end_index].to_vec())?;
-        sub_expression_solutions.push((
-            Token::Number(sub_expression_result),
-            index..=pre_calc_end_index + 1,
-        ))
+        let sub_expression_result = eval_expression(tokens[pre_calc_start_index..=pre_calc_end_index].to_vec())?;
+        sub_expression_solutions.push((Token::Number(sub_expression_result), index..=pre_calc_end_index + 1))
     }
 
     // replace each token in the string with
@@ -182,20 +152,12 @@ pub fn eval_expression(tokens: Vec<Token>) -> Result<f64, String> {
         return Ok(after_sub_expressions.first().unwrap().to_f64().unwrap());
     }
 
-    let after_exp = eval_operators(
-        after_sub_expressions,
-        &[Operator::Exponentiation],
-        EvalOperatorsDirection::RightToLeft,
-    )?;
+    let after_exp = eval_operators(after_sub_expressions, &[Operator::Exponentiation], EvalOperatorsDirection::RightToLeft)?;
     if is_solved_token_string(&after_exp) {
         return Ok(after_exp.first().unwrap().to_f64().unwrap());
     }
 
-    let after_mult_div = eval_operators(
-        after_exp,
-        &[Operator::Multiplication, Operator::Division],
-        EvalOperatorsDirection::LeftToRight,
-    )?;
+    let after_mult_div = eval_operators(after_exp, &[Operator::Multiplication, Operator::Division], EvalOperatorsDirection::LeftToRight)?;
     if is_solved_token_string(&after_mult_div) {
         return Ok(after_mult_div.first().unwrap().to_f64().unwrap());
     }

@@ -6,6 +6,3 @@ pub use parser::*;
 
 pub mod token;
 pub use token::*;
-
-pub mod utilities;
-pub use utilities::*;
