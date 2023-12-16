@@ -4,11 +4,11 @@ use itertools::Itertools;
 
 use crate::*;
 
-enum EvalOperatorsDirection {
+enum NumOpNumDirection {
     LeftToRight,
     RightToLeft,
 }
-impl EvalOperatorsDirection {
+impl NumOpNumDirection {
     pub fn get_adjacent_operand_index(&self, index: usize) -> usize {
         match self {
             Self::LeftToRight => index + 2,
@@ -41,7 +41,7 @@ impl EvalOperatorsDirection {
     }
 }
 
-fn eval_operators(tokens: Vec<Token>,operators: &[Operator], eval_direction: EvalOperatorsDirection) -> Result<Vec<Token>, String> {
+fn eval_num_op_num_operators(tokens: Vec<Token>,operators: &[Operator], eval_direction: NumOpNumDirection) -> Result<Vec<Token>, String> {
     let mut tokens = tokens;
 
     let mut index = eval_direction.get_starting_index(&tokens)?;
@@ -72,7 +72,7 @@ fn eval_operators(tokens: Vec<Token>,operators: &[Operator], eval_direction: Eva
             } else {
                 tokens.insert(insertion_index, new_number_token)
             }
-            if let EvalOperatorsDirection::RightToLeft = eval_direction {
+            if let NumOpNumDirection::RightToLeft = eval_direction {
                 index -= 2
             }
         } else {
@@ -94,11 +94,9 @@ fn find_sub_expression_end(tokens: &Vec<Token>, expression_start_index: usize) -
 
     let mut current_expression_scope = 0;
     for (i, token) in tokens.iter().enumerate().skip(expression_start_index) {
-        if let Token::Operator(Operator::OpenParen) = token {
+        if token.is_open_paren() {
             current_expression_scope += 1
-        }
-
-        if let Token::Operator(Operator::CloseParen) = token {
+        } else if token.is_close_paren() {
             if current_expression_scope == 0 {
                 return Ok(i - 1);
             }
@@ -113,7 +111,7 @@ fn find_sub_expression_end(tokens: &Vec<Token>, expression_start_index: usize) -
 
 /// this will check if a token string is solved. if there is only one number token left in the token string the expression is solved.
 fn is_solved_token_string(tokens: &Vec<Token>) -> bool {
-    if tokens.len() == 1&& tokens.first().is_some_and(|token| { if let Token::Number(_) = token { true } else { false } }) {
+    if tokens.len() == 1&& tokens.first().is_some_and(|token| token.is_num()) {
         true
     } else {
         false
@@ -135,7 +133,7 @@ pub fn eval_expression(tokens: Vec<Token>) -> Result<f64, String> {
 
     // find each sub expression and store a list of the answer and range of tokens they will replace.
     let mut sub_expression_solutions: Vec<(Token, RangeInclusive<usize>)> = vec![];
-    for (index, _token) in tokens.iter().enumerate().filter(|(_index, token)| { if let Token::Operator(Operator::OpenParen) = token { true } else { false } }) {
+    for (index, _token) in tokens.iter().enumerate().filter(|(_index, token)| token.is_open_paren()) {
         if sub_expression_solutions.iter().any(|(_token, range)| range.contains(&index)) {
             continue;
         }
@@ -158,17 +156,17 @@ pub fn eval_expression(tokens: Vec<Token>) -> Result<f64, String> {
         return Ok(after_sub_expressions.first().unwrap().to_f64().unwrap());
     }
 
-    let after_exp = eval_operators(after_sub_expressions, &[Operator::Exponentiation], EvalOperatorsDirection::RightToLeft)?;
+    let after_exp = eval_num_op_num_operators(after_sub_expressions, &[Operator::Exponentiation], NumOpNumDirection::RightToLeft)?;
     if is_solved_token_string(&after_exp) {
         return Ok(after_exp.first().unwrap().to_f64().unwrap());
     }
 
-    let after_mult_div = eval_operators(after_exp, &[Operator::Multiplication, Operator::Division], EvalOperatorsDirection::LeftToRight)?;
+    let after_mult_div = eval_num_op_num_operators(after_exp, &[Operator::Multiplication, Operator::Division, Operator::Modulus], NumOpNumDirection::LeftToRight)?;
     if is_solved_token_string(&after_mult_div) {
         return Ok(after_mult_div.first().unwrap().to_f64().unwrap());
     }
 
-    let after_add_sub = eval_operators(after_mult_div, &[Operator::Addition, Operator::Subtraction], EvalOperatorsDirection::LeftToRight)?;
+    let after_add_sub = eval_num_op_num_operators(after_mult_div, &[Operator::Addition, Operator::Subtraction], NumOpNumDirection::LeftToRight)?;
     if is_solved_token_string(&after_add_sub) {
         return Ok(after_add_sub.first().unwrap().to_f64().unwrap());
     }

@@ -59,6 +59,7 @@ pub enum Operator {
     Subtraction,
     Multiplication,
     Division,
+    Modulus,
     Exponentiation,
     OpenParen,
     CloseParen,
@@ -70,6 +71,7 @@ impl Operator {
             Self::Subtraction => Ok(num1 - num2),
             Self::Multiplication => Ok(num1 * num2),
             Self::Division => Ok(num1 / num2),
+            Self::Modulus => Ok(num1 % num2),
             Self::Exponentiation => Ok(num1.powf(num2)),
             _ => Err(()),
         }

@@ -63,6 +63,7 @@ fn parse_char_token(parse_state: ParseState<'_>) -> Result<ParseState, (String, 
         '*' => Token::Operator(Operator::Multiplication),
         '/' => Token::Operator(Operator::Division),
         '^' => Token::Operator(Operator::Exponentiation),
+        '%' => Token::Operator(Operator::Modulus),
         '(' => Token::Operator(Operator::OpenParen),
         ')' => Token::Operator(Operator::CloseParen),
         _ => return Err(("error : parse_operator : could not parse char".to_string(), parse_state))
