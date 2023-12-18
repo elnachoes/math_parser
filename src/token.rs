@@ -1,7 +1,11 @@
-#[derive(Clone, Copy, Debug)]
+pub type Expression = Vec<Token>;
+pub type Arguments = Vec<Expression>;
+
+#[derive(Clone, Debug)]
 pub enum Token {
     Number(f64),
     Operator(Operator),
+    Identity(String)
 }
 impl Token {
     pub fn to_f64(&self) -> Option<f64> {
@@ -9,6 +13,30 @@ impl Token {
             Some(*num)
         } else {
             None
+        }
+    }
+
+    pub fn is_argument_separator(&self) -> bool {
+        if let Self::Operator(Operator::ArgumentSeparator) = self { 
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn identity_string(&self) -> Option<&str> {
+        if let Self::Identity(identity) = self {
+            Some(&identity)
+        } else {
+            None
+        }
+    }
+
+    pub fn is_identity(&self) -> bool {
+        if let Self::Identity(_) = self {
+            true
+        } else {
+            false
         }
     }
 
@@ -63,6 +91,7 @@ pub enum Operator {
     Exponentiation,
     OpenParen,
     CloseParen,
+    ArgumentSeparator,
 }
 impl Operator {
     pub fn apply_operation(&self, num1: f64, num2: f64) -> Result<f64, ()> {

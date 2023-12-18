@@ -23,14 +23,14 @@ impl NumOpNumDirection {
         }
     }
 
-    pub fn index_at_expression_end(&self, tokens: &Vec<Token>, index: usize) -> bool {
+    pub fn index_at_expression_end(&self, tokens: &Expression, index: usize) -> bool {
         match self {
             Self::LeftToRight => index == tokens.len() - 1,
             Self::RightToLeft => index == 0,
         }
     }
 
-    pub fn get_starting_index(&self, tokens: &Vec<Token>) -> Result<usize, String> {
+    pub fn get_starting_index(&self, tokens: &Expression) -> Result<usize, String> {
         if tokens.len() == 0 {
             return Err("error : no starting index for token string of length 0".to_string());
         }
@@ -41,7 +41,7 @@ impl NumOpNumDirection {
     }
 }
 
-fn eval_num_op_num_operators(tokens: Vec<Token>,operators: &[Operator], eval_direction: NumOpNumDirection) -> Result<Vec<Token>, String> {
+fn eval_num_op_num_operators(tokens: Expression, operators: &[Operator], eval_direction: NumOpNumDirection) -> Result<Expression, String> {
     let mut tokens = tokens;
 
     let mut index = eval_direction.get_starting_index(&tokens)?;
@@ -83,7 +83,7 @@ fn eval_num_op_num_operators(tokens: Vec<Token>,operators: &[Operator], eval_dir
 }
 
 /// this will find the end of a sub expression by itterating through the token string and finding where the scope is enclosed.
-fn find_sub_expression_end(tokens: &Vec<Token>, expression_start_index: usize) -> Result<usize, String> {
+fn find_sub_expression_end(tokens: &Expression, expression_start_index: usize) -> Result<usize, String> {
     if expression_start_index >= tokens.len() || tokens.get(expression_start_index).is_none() {
         return Err("error : find_expression_end".to_string());
     }
@@ -110,7 +110,7 @@ fn find_sub_expression_end(tokens: &Vec<Token>, expression_start_index: usize) -
 }
 
 /// this will check if a token string is solved. if there is only one number token left in the token string the expression is solved.
-fn is_solved_token_string(tokens: &Vec<Token>) -> bool {
+fn is_solved_token_string(tokens: &Expression) -> bool {
     if tokens.len() == 1&& tokens.first().is_some_and(|token| token.is_num()) {
         true
     } else {
@@ -125,7 +125,7 @@ pub fn eval_str(string: &str) -> Result<f64, String> {
 }
 
 /// this will evaluate a token string expresssion recursively.
-pub fn eval_expression(tokens: Vec<Token>) -> Result<f64, String> {
+pub fn eval_expression(tokens: Expression) -> Result<f64, String> {
     // if the token string comes in solved return the solved answer
     if is_solved_token_string(&tokens) {
         return Ok(tokens.first().unwrap().to_f64().unwrap());
@@ -137,10 +137,25 @@ pub fn eval_expression(tokens: Vec<Token>) -> Result<f64, String> {
         if sub_expression_solutions.iter().any(|(_token, range)| range.contains(&index)) {
             continue;
         }
+
+        // todo : figure out if there is a sub expression OR a function that needs to get solved. 
         let pre_calc_start_index = index + 1;
-        let pre_calc_end_index = find_sub_expression_end(&tokens, pre_calc_start_index)?;
-        let sub_expression_result = eval_expression(tokens[pre_calc_start_index..=pre_calc_end_index].to_vec())?;
-        sub_expression_solutions.push((Token::Number(sub_expression_result), index..=pre_calc_end_index + 1))
+        
+        // if the prior token to the open paren is an identity, a function is being invoked and must be solved, otherwise solve a sub expression.
+        let sub_expression_result_range = if index != 0 && tokens.iter().nth(index - 1).is_some_and(|token| token.is_identity()) {
+            let function_signature = tokens.iter().nth(index - 1).unwrap().identity_string().unwrap();
+            let pre_calc_end_index = find_sub_expression_end(&tokens, pre_calc_start_index)?;
+            let args = get_arguments_from_expression(tokens[pre_calc_start_index..=pre_calc_end_index].to_vec());
+            let function_result = try_eval_builtin_math_function(function_signature, args)?;
+            // println!("{function_result:?}");
+            (Token::Number(function_result), index - 1..=pre_calc_end_index + 1)
+        } else {
+            let pre_calc_end_index = find_sub_expression_end(&tokens, pre_calc_start_index)?;
+            let sub_expression_result = eval_expression(tokens[pre_calc_start_index..=pre_calc_end_index].to_vec())?;
+            (Token::Number(sub_expression_result), index..=pre_calc_end_index + 1)
+        };
+
+        sub_expression_solutions.push(sub_expression_result_range)
     }
 
     // replace each token in the string with
