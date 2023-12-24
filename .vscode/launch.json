@@ -15,7 +15,8 @@
             "environment": [],
             "console": "integratedTerminal",
             "args": [
-                "cos(9 * 9)"
+                "cos(3744.5)"
+                // "cos(5)"
             ],
         },
         {

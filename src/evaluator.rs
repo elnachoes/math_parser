@@ -143,12 +143,17 @@ pub fn eval_expression(tokens: Expression) -> Result<f64, String> {
         
         // if the prior token to the open paren is an identity, a function is being invoked and must be solved, otherwise solve a sub expression.
         let sub_expression_result_range = if index != 0 && tokens.iter().nth(index - 1).is_some_and(|token| token.is_identity()) {
+            // println!("sub")
             let function_signature = tokens.iter().nth(index - 1).unwrap().identity_string().unwrap();
             let pre_calc_end_index = find_sub_expression_end(&tokens, pre_calc_start_index)?;
-            let args = get_arguments_from_expression(tokens[pre_calc_start_index..=pre_calc_end_index].to_vec());
-            let function_result = try_eval_builtin_math_function(function_signature, args)?;
-            // println!("{function_result:?}");
+
+            println!("this is the slice going into the try eval math function -> {:?}", tokens[pre_calc_start_index..=pre_calc_end_index].to_vec());
+
+
+            let function_result = try_eval_builtin_math_function(function_signature, tokens[pre_calc_start_index..=pre_calc_end_index].to_vec())?;
+            println!("func result : {function_result:?}");
             (Token::Number(function_result), index - 1..=pre_calc_end_index + 1)
+            // return Err("error".to_string())
         } else {
             let pre_calc_end_index = find_sub_expression_end(&tokens, pre_calc_start_index)?;
             let sub_expression_result = eval_expression(tokens[pre_calc_start_index..=pre_calc_end_index].to_vec())?;
@@ -187,4 +192,63 @@ pub fn eval_expression(tokens: Expression) -> Result<f64, String> {
     }
 
     Err("error : unsolved expression : {}".to_string())
+}
+
+
+#[derive(Clone, Debug)]
+struct DefinedMathFunction {
+    signature : String,
+    parameter_names : Vec<String>,
+    expression : Expression 
+}
+
+pub fn try_reduce_args(expression : Expression) -> Result<Expression, String> {
+    println!("trying to reduce this expression : {expression:?}");
+    let reduced_arguments : Vec<Result<f64, String>> = expression
+        .split(|token| token.is_argument_separator())
+        .map(|expression| {
+            println!("expression to reduce -> {expression:?}");
+            eval_expression(expression.to_vec())
+        })
+        .collect();
+
+    // println!("reduced arguments -> {reduced_arguments:?}");
+
+    if reduced_arguments.iter().any(|token| token.is_err()) { return  Err("could not reduce all of the arguments".to_string()) };
+
+    Ok(reduced_arguments.into_iter().map(|args| Token::Number(args.unwrap())).collect::<Expression>())
+}
+
+pub fn try_eval_builtin_math_function(signature : &str, args : Expression) -> Result<f64, String> {
+    let reduced_args = try_reduce_args(args)?.into_iter().map(|token| token.to_f64().unwrap()).collect::<Vec<f64>>();
+
+    match signature {
+
+        // "sqrt" =>
+
+        // trig
+        "sin" | "sine" =>       evaluate_func(|args| Ok(args[0].sin()), &reduced_args, 1),
+        "cos" | "cosine" =>     evaluate_func(|args| Ok(args[0].cos()), &reduced_args, 1),
+        "tan" | "tangent" =>    evaluate_func(|args| Ok(args[0].tan()), &reduced_args, 1),
+        "sec" | "secant" =>     evaluate_func(|args| Ok(1f64/args[0].cos()), &reduced_args, 1),
+        "csc" | "cosecant" =>   evaluate_func(|args| Ok(1f64/args[0].sin()), &reduced_args, 1),
+        "cot" | "cotangent" =>  evaluate_func(|args| Ok(1f64/args[0].tan()), &reduced_args, 1),
+
+        // // log
+        // "log" => one_input_fn(|num| num.log10(), &args),
+        // "ln" => one_input_fn(|num| num.ln(), &args),
+
+        // "sum" => Ok(0.),
+
+        // note : we might actually need a better kind of error here 
+        _ => Err("err : was unable to evaluate builtin function".to_string())
+    }
+}
+
+/// this will invoke a math function like cosine and it will handle an error in arguments length.
+fn evaluate_func(func : fn(&[f64]) -> Result<f64, String>, args : &[f64],  expected_arg_count : usize) -> Result<f64, String> {
+    let mut args = args;
+    if args.len() != expected_arg_count { return Err("expected more args".to_string()) }
+
+    func(args)
 }
