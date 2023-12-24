@@ -1,11 +1,10 @@
 pub type Expression = Vec<Token>;
-pub type Arguments = Vec<Expression>;
 
 #[derive(Clone, Debug)]
 pub enum Token {
     Number(f64),
     Operator(Operator),
-    Identity(String)
+    Identity(String),
 }
 impl Token {
     pub fn to_f64(&self) -> Option<f64> {
@@ -17,7 +16,7 @@ impl Token {
     }
 
     pub fn is_argument_separator(&self) -> bool {
-        if let Self::Operator(Operator::ArgumentSeparator) = self { 
+        if let Self::Operator(Operator::ArgumentSeparator) = self {
             true
         } else {
             false

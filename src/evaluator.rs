@@ -1,4 +1,4 @@
-use std::ops::RangeInclusive;
+use std::{borrow::Borrow, collections::HashMap, error, fmt::Arguments, ops::RangeInclusive};
 
 use itertools::Itertools;
 
@@ -41,7 +41,11 @@ impl NumOpNumDirection {
     }
 }
 
-fn eval_num_op_num_operators(tokens: Expression, operators: &[Operator], eval_direction: NumOpNumDirection) -> Result<Expression, String> {
+fn eval_num_op_num_operators(
+    tokens: Expression,
+    operators: &[Operator],
+    eval_direction: NumOpNumDirection,
+) -> Result<Expression, String> {
     let mut tokens = tokens;
 
     let mut index = eval_direction.get_starting_index(&tokens)?;
@@ -53,7 +57,9 @@ fn eval_num_op_num_operators(tokens: Expression, operators: &[Operator], eval_di
 
         let operation_range = eval_direction.get_operation_range_at_index(index);
 
-        let reduction_option = if let &[Token::Number(left_num), Token::Operator(op), Token::Number(right_num)] = &tokens[operation_range.clone()] {
+        let reduction_option = if let &[Token::Number(left_num), Token::Operator(op), Token::Number(right_num)] =
+            &tokens[operation_range.clone()]
+        {
             if operators.iter().contains(&op) {
                 op.apply_operation(left_num, right_num)
             } else {
@@ -83,7 +89,10 @@ fn eval_num_op_num_operators(tokens: Expression, operators: &[Operator], eval_di
 }
 
 /// this will find the end of a sub expression by itterating through the token string and finding where the scope is enclosed.
-fn find_sub_expression_end(tokens: &Expression, expression_start_index: usize) -> Result<usize, String> {
+fn find_sub_expression_end(
+    tokens: &Expression,
+    expression_start_index: usize,
+) -> Result<usize, String> {
     if expression_start_index >= tokens.len() || tokens.get(expression_start_index).is_none() {
         return Err("error : find_expression_end".to_string());
     }
@@ -111,7 +120,7 @@ fn find_sub_expression_end(tokens: &Expression, expression_start_index: usize) -
 
 /// this will check if a token string is solved. if there is only one number token left in the token string the expression is solved.
 fn is_solved_token_string(tokens: &Expression) -> bool {
-    if tokens.len() == 1&& tokens.first().is_some_and(|token| token.is_num()) {
+    if tokens.len() == 1 && tokens.first().is_some_and(|token| token.is_num()) {
         true
     } else {
         false
@@ -133,31 +142,50 @@ pub fn eval_expression(tokens: Expression) -> Result<f64, String> {
 
     // find each sub expression and store a list of the answer and range of tokens they will replace.
     let mut sub_expression_solutions: Vec<(Token, RangeInclusive<usize>)> = vec![];
-    for (index, _token) in tokens.iter().enumerate().filter(|(_index, token)| token.is_open_paren()) {
-        if sub_expression_solutions.iter().any(|(_token, range)| range.contains(&index)) {
+    for (index, _token) in tokens
+        .iter()
+        .enumerate()
+        .filter(|(_index, token)| token.is_open_paren())
+    {
+        if sub_expression_solutions
+            .iter()
+            .any(|(_token, range)| range.contains(&index))
+        {
             continue;
         }
 
-        // todo : figure out if there is a sub expression OR a function that needs to get solved. 
+        // todo : figure out if there is a sub expression OR a function that needs to get solved.
         let pre_calc_start_index = index + 1;
-        
+        let pre_calc_end_index = find_sub_expression_end(&tokens, pre_calc_start_index)?;
+
         // if the prior token to the open paren is an identity, a function is being invoked and must be solved, otherwise solve a sub expression.
-        let sub_expression_result_range = if index != 0 && tokens.iter().nth(index - 1).is_some_and(|token| token.is_identity()) {
-            // println!("sub")
-            let function_signature = tokens.iter().nth(index - 1).unwrap().identity_string().unwrap();
-            let pre_calc_end_index = find_sub_expression_end(&tokens, pre_calc_start_index)?;
-
-            println!("this is the slice going into the try eval math function -> {:?}", tokens[pre_calc_start_index..=pre_calc_end_index].to_vec());
-
-
-            let function_result = try_eval_builtin_math_function(function_signature, tokens[pre_calc_start_index..=pre_calc_end_index].to_vec())?;
-            println!("func result : {function_result:?}");
-            (Token::Number(function_result), index - 1..=pre_calc_end_index + 1)
-            // return Err("error".to_string())
+        let sub_expression_result_range = if index != 0
+            && tokens
+                .iter()
+                .nth(index - 1)
+                .is_some_and(|token| token.is_identity())
+        {
+            let function_signature = tokens
+                .iter()
+                .nth(index - 1)
+                .unwrap()
+                .identity_string()
+                .unwrap();
+            let function_result = try_eval_builtin_math_function(
+                function_signature,
+                tokens[pre_calc_start_index..=pre_calc_end_index].to_vec(),
+            )?;
+            (
+                Token::Number(function_result),
+                index - 1..=pre_calc_end_index + 1,
+            )
         } else {
-            let pre_calc_end_index = find_sub_expression_end(&tokens, pre_calc_start_index)?;
-            let sub_expression_result = eval_expression(tokens[pre_calc_start_index..=pre_calc_end_index].to_vec())?;
-            (Token::Number(sub_expression_result), index..=pre_calc_end_index + 1)
+            let sub_expression_result =
+                eval_expression(tokens[pre_calc_start_index..=pre_calc_end_index].to_vec())?;
+            (
+                Token::Number(sub_expression_result),
+                index..=pre_calc_end_index + 1,
+            )
         };
 
         sub_expression_solutions.push(sub_expression_result_range)
@@ -176,17 +204,33 @@ pub fn eval_expression(tokens: Expression) -> Result<f64, String> {
         return Ok(after_sub_expressions.first().unwrap().to_f64().unwrap());
     }
 
-    let after_exp = eval_num_op_num_operators(after_sub_expressions, &[Operator::Exponentiation], NumOpNumDirection::RightToLeft)?;
+    let after_exp = eval_num_op_num_operators(
+        after_sub_expressions,
+        &[Operator::Exponentiation],
+        NumOpNumDirection::RightToLeft,
+    )?;
     if is_solved_token_string(&after_exp) {
         return Ok(after_exp.first().unwrap().to_f64().unwrap());
     }
 
-    let after_mult_div = eval_num_op_num_operators(after_exp, &[Operator::Multiplication, Operator::Division, Operator::Modulus], NumOpNumDirection::LeftToRight)?;
+    let after_mult_div = eval_num_op_num_operators(
+        after_exp,
+        &[
+            Operator::Multiplication,
+            Operator::Division,
+            Operator::Modulus,
+        ],
+        NumOpNumDirection::LeftToRight,
+    )?;
     if is_solved_token_string(&after_mult_div) {
         return Ok(after_mult_div.first().unwrap().to_f64().unwrap());
     }
 
-    let after_add_sub = eval_num_op_num_operators(after_mult_div, &[Operator::Addition, Operator::Subtraction], NumOpNumDirection::LeftToRight)?;
+    let after_add_sub = eval_num_op_num_operators(
+        after_mult_div,
+        &[Operator::Addition, Operator::Subtraction],
+        NumOpNumDirection::LeftToRight,
+    )?;
     if is_solved_token_string(&after_add_sub) {
         return Ok(after_add_sub.first().unwrap().to_f64().unwrap());
     }
@@ -194,17 +238,9 @@ pub fn eval_expression(tokens: Expression) -> Result<f64, String> {
     Err("error : unsolved expression : {}".to_string())
 }
 
-
-#[derive(Clone, Debug)]
-struct DefinedMathFunction {
-    signature : String,
-    parameter_names : Vec<String>,
-    expression : Expression 
-}
-
-pub fn try_reduce_args(expression : Expression) -> Result<Expression, String> {
+fn try_reduce_args(expression: Expression) -> Result<Expression, String> {
     println!("trying to reduce this expression : {expression:?}");
-    let reduced_arguments : Vec<Result<f64, String>> = expression
+    let reduced_arguments: Vec<Result<f64, String>> = expression
         .split(|token| token.is_argument_separator())
         .map(|expression| {
             println!("expression to reduce -> {expression:?}");
@@ -212,43 +248,146 @@ pub fn try_reduce_args(expression : Expression) -> Result<Expression, String> {
         })
         .collect();
 
-    // println!("reduced arguments -> {reduced_arguments:?}");
+    if reduced_arguments.iter().any(|token| token.is_err()) {
+        return Err("could not reduce all of the arguments".to_string());
+    };
 
-    if reduced_arguments.iter().any(|token| token.is_err()) { return  Err("could not reduce all of the arguments".to_string()) };
-
-    Ok(reduced_arguments.into_iter().map(|args| Token::Number(args.unwrap())).collect::<Expression>())
+    Ok(reduced_arguments
+        .into_iter()
+        .map(|args| Token::Number(args.unwrap()))
+        .collect::<Expression>())
 }
 
-pub fn try_eval_builtin_math_function(signature : &str, args : Expression) -> Result<f64, String> {
-    let reduced_args = try_reduce_args(args)?.into_iter().map(|token| token.to_f64().unwrap()).collect::<Vec<f64>>();
-
+/// this maps built in functions to signatures for trig/alc/calc/stats/etc functions
+fn try_eval_builtin_math_function(signature: &str, args: Expression) -> Result<f64, String> {
     match signature {
-
-        // "sqrt" =>
+        // alg
+        "sqrt" => evaluate_static_math_func(|args| Ok(args[0].sqrt()), args, Some(1)),
+        "cbrt" => evaluate_static_math_func(|args| Ok(args[0].cbrt()), args, Some(1)),
+        "pow" => evaluate_static_math_func(|args| Ok(args[0].powf(args[1])), args, Some(2)),
+        "abs" => evaluate_static_math_func(|args| Ok(args[0].abs()), args, Some(1)),
 
         // trig
-        "sin" | "sine" =>       evaluate_func(|args| Ok(args[0].sin()), &reduced_args, 1),
-        "cos" | "cosine" =>     evaluate_func(|args| Ok(args[0].cos()), &reduced_args, 1),
-        "tan" | "tangent" =>    evaluate_func(|args| Ok(args[0].tan()), &reduced_args, 1),
-        "sec" | "secant" =>     evaluate_func(|args| Ok(1f64/args[0].cos()), &reduced_args, 1),
-        "csc" | "cosecant" =>   evaluate_func(|args| Ok(1f64/args[0].sin()), &reduced_args, 1),
-        "cot" | "cotangent" =>  evaluate_func(|args| Ok(1f64/args[0].tan()), &reduced_args, 1),
+        "sin" | "sine" => evaluate_static_math_func(|args| Ok(args[0].sin()), args, Some(1)),
+        "cos" | "cosine" => evaluate_static_math_func(|args| Ok(args[0].cos()), args, Some(1)),
+        "tan" | "tangent" => evaluate_static_math_func(|args| Ok(args[0].tan()), args, Some(1)),
+        "sec" | "secant" => {
+            evaluate_static_math_func(|args| Ok(1f64 / args[0].cos()), args, Some(1))
+        }
+        "csc" | "cosecant" => {
+            evaluate_static_math_func(|args| Ok(1f64 / args[0].sin()), args, Some(1))
+        }
+        "cot" | "cotangent" => {
+            evaluate_static_math_func(|args| Ok(1f64 / args[0].tan()), args, Some(1))
+        }
 
-        // // log
-        // "log" => one_input_fn(|num| num.log10(), &args),
-        // "ln" => one_input_fn(|num| num.ln(), &args),
+        // log
+        "log" | "log10" => evaluate_static_math_func(|args| Ok(args[0].log10()), args, Some(1)),
+        "ln" => evaluate_static_math_func(|args| Ok(args[0].ln()), args, Some(1)),
 
-        // "sum" => Ok(0.),
+        // statistics
+        "mean" => evaluate_static_math_func(
+            |args| Ok(args.iter().fold(0f64, |acc, x| acc + x) / args.len() as f64),
+            args,
+            None,
+        ),
 
-        // note : we might actually need a better kind of error here 
-        _ => Err("err : was unable to evaluate builtin function".to_string())
+        // "sum" => evaluate_static_math_func(
+        //     |summation_args| {
+        //         let summation_function = DynamicMathFunction::anonymous(vec!["n".to_string()], vec![]);
+
+        //         Ok(0f64)
+        //     }, 
+        //     args[0..2].to_vec(), 
+        //     None
+        // ),
+
+        // note : we might actually need a better kind of error here
+        _ => Err("error : was unable to evaluate builtin function".to_string()),
     }
 }
 
 /// this will invoke a math function like cosine and it will handle an error in arguments length.
-fn evaluate_func(func : fn(&[f64]) -> Result<f64, String>, args : &[f64],  expected_arg_count : usize) -> Result<f64, String> {
-    let mut args = args;
-    if args.len() != expected_arg_count { return Err("expected more args".to_string()) }
+fn evaluate_static_math_func(
+    func: fn(&[f64]) -> Result<f64, String>,
+    args: Expression,
+    expected_arg_count: Option<usize>,
+) -> Result<f64, String> {
+    if args.len() == 0 {
+        return Err("error : arguments must be supplied to a function".to_string());
+    }
+    let reduced_args = try_reduce_args(args)?
+        .into_iter()
+        .map(|token| token.to_f64().unwrap())
+        .collect::<Vec<f64>>();
+    if expected_arg_count.is_some_and(|arg_count| arg_count != reduced_args.len()) {
+        return Err(format!(
+            "expected {} args but recieved : {}",
+            expected_arg_count.unwrap(),
+            reduced_args.len()
+        ));
+    }
+    func(&reduced_args)
+}
 
-    func(args)
+// fn evaluate_dynamic_function()
+
+
+
+#[derive(Clone, Debug)]
+pub struct DynamicMathFunction {
+    pub signature: Option<String>,
+    pub arg_names: Vec<String>,
+    pub expression: Expression,
+}
+impl DynamicMathFunction {
+    pub fn anonymous(arg_names: Vec<String>, expression : Expression) -> Result<Self, String> {
+        Ok(Self {
+            signature : None,
+            arg_names : arg_names,
+            expression : expression
+        })
+    }
+
+    //todo
+    pub fn validate_function() -> Result<(), String> {
+        Ok(())
+    }
+
+    // todo
+    pub fn evaluate(&mut self, args: &[f64]) -> Result<f64, String> {
+        if args.len() == 0 {
+            return Err("error : arguments must be supplied to a function".to_string());
+        }
+
+        if args.len() != self.arg_names.len() {
+            return Err(format!(
+                "expected {} args but recieved : {}",
+                self.arg_names.len(),
+                args.len()
+            ));
+        }
+
+        let variable_arg_map = self
+            .arg_names
+            .iter()
+            .enumerate()
+            .map(|(index, arg_name)| (arg_name, args[index]))
+            .collect::<HashMap<&String, f64>>();
+
+        let expression_to_evaluate = self
+            .expression
+            .clone()
+            .into_iter()
+            .map(|token| {
+                if let Token::Identity(identity) = token {
+                    Token::Number(variable_arg_map[&identity])
+                } else {
+                    token
+                }
+            })
+            .collect();
+
+        eval_expression(expression_to_evaluate)
+    }
 }

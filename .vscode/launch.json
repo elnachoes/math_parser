@@ -15,8 +15,12 @@
             "environment": [],
             "console": "integratedTerminal",
             "args": [
-                "cos(3744.5)"
-                // "cos(5)"
+                // "log(25) / 2"
+                "cos(5)"
+                //  "mean(1,2,3,4)"
+                // "pow(5,2)"
+                // "abs(5)"
+
             ],
         },
         {
