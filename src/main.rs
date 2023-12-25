@@ -3,7 +3,10 @@ use math_parser::*;
 fn main() -> Result<(), String> {
     // ---- testing eval and testing parser ----
     // println!("{:?}",parse_str(std::env::args().skip(1).collect::<String>().as_str())?);
-    // println!("{:?}",eval_str(std::env::args().skip(1).collect::<String>().as_str())?);
+    println!(
+        "{:?}",
+        eval_str(std::env::args().skip(1).collect::<String>().as_str())?
+    );
 
     // ---- testing user defined functions ----
 

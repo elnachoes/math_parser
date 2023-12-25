@@ -88,6 +88,15 @@ fn eval_num_op_num_operators(
     Ok(tokens)
 }
 
+
+
+// todo : build a reduce addition subtraction operators
+
+
+// todo : build a eval single operator single operand for things like factorial or a negative sign present by itself next to a number
+// fn reduce_addition_subtraction_operators()
+
+
 /// this will find the end of a sub expression by itterating through the token string and finding where the scope is enclosed.
 fn find_sub_expression_end(
     tokens: &Expression,
@@ -226,6 +235,8 @@ pub fn eval_expression(tokens: Expression) -> Result<f64, String> {
         return Ok(after_mult_div.first().unwrap().to_f64().unwrap());
     }
 
+    // todo : we need to reduce addition subtraction operators here prior to evaluating them
+
     let after_add_sub = eval_num_op_num_operators(
         after_mult_div,
         &[Operator::Addition, Operator::Subtraction],
@@ -234,7 +245,7 @@ pub fn eval_expression(tokens: Expression) -> Result<f64, String> {
     if is_solved_token_string(&after_add_sub) {
         return Ok(after_add_sub.first().unwrap().to_f64().unwrap());
     }
-
+    
     Err("error : unsolved expression : {}".to_string())
 }
 
@@ -292,16 +303,6 @@ fn try_eval_builtin_math_function(signature: &str, args: Expression) -> Result<f
             None,
         ),
 
-        // "sum" => evaluate_static_math_func(
-        //     |summation_args| {
-        //         let summation_function = DynamicMathFunction::anonymous(vec!["n".to_string()], vec![]);
-
-        //         Ok(0f64)
-        //     }, 
-        //     args[0..2].to_vec(), 
-        //     None
-        // ),
-
         // note : we might actually need a better kind of error here
         _ => Err("error : was unable to evaluate builtin function".to_string()),
     }
@@ -330,10 +331,6 @@ fn evaluate_static_math_func(
     func(&reduced_args)
 }
 
-// fn evaluate_dynamic_function()
-
-
-
 #[derive(Clone, Debug)]
 pub struct DynamicMathFunction {
     pub signature: Option<String>,
@@ -355,7 +352,7 @@ impl DynamicMathFunction {
     }
 
     // todo
-    pub fn evaluate(&mut self, args: &[f64]) -> Result<f64, String> {
+    pub fn evaluate(&self, args: &[f64]) -> Result<f64, String> {
         if args.len() == 0 {
             return Err("error : arguments must be supplied to a function".to_string());
         }
