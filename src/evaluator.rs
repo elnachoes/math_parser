@@ -1,4 +1,10 @@
-use std::{borrow::Borrow, collections::HashMap, error, fmt::Arguments, ops::RangeInclusive};
+use std::{
+    borrow::Borrow,
+    collections::HashMap,
+    error,
+    fmt::Arguments,
+    ops::{Range, RangeInclusive},
+};
 
 use itertools::Itertools;
 
@@ -61,7 +67,7 @@ fn eval_num_op_num_operators(
             &tokens[operation_range.clone()]
         {
             if operators.iter().contains(&op) {
-                op.apply_operation(left_num, right_num)
+                op.apply_operation_2_operands(left_num, right_num)
             } else {
                 Err(())
             }
@@ -88,30 +94,90 @@ fn eval_num_op_num_operators(
     Ok(tokens)
 }
 
-
-
 // todo : build a reduce addition subtraction operators
+pub fn reduce_addition_subtraction_operators(expression: Expression) -> Expression {
+    let mut expression = expression;
 
+    let mut ranges_to_replace: Vec<(RangeInclusive<usize>, Token)> = Vec::new();
+    for (index, token) in expression.iter().enumerate().filter(|(_index, token)| {
+        if let Token::Operator(Operator::Addition | Operator::Subtraction) = token {
+            true
+        } else {
+            false
+        }
+    }) {
+        if ranges_to_replace.last().is_none()
+            | ranges_to_replace
+                .last()
+                .is_some_and(|(range, _token)| range.end() + 1 < index)
+            && token
+                .get_operator()
+                .is_some_and(|operator| operator.is_addition_or_subtraction())
+        {
+            ranges_to_replace.push((index..=index, token.clone()));
+            continue;
+        }
+
+        if ranges_to_replace
+            .last()
+            .is_some_and(|(range, _token)| range.end() + 1 == index)
+        {
+            if let Token::Operator(Operator::Subtraction) = token {
+                let new_operator = ranges_to_replace
+                    .last()
+                    .unwrap()
+                    .1
+                    .get_operator()
+                    .unwrap()
+                    .get_inverse_operator()
+                    .unwrap();
+                println!("new operator : {new_operator:?}");
+                ranges_to_replace.last_mut().unwrap().1 = Token::Operator(new_operator)
+            }
+            ranges_to_replace.last_mut().unwrap().0 = *ranges_to_replace.last().unwrap().0.start()
+                ..=*ranges_to_replace.last().unwrap().0.end() + 1
+        }
+    }
+
+    println!("{ranges_to_replace:?}");
+
+    let mut range_offset = 0;
+    for (range, token) in ranges_to_replace {
+        // println!("offset : {range_offset:?}");
+        // println!("range : {:?}", range.start()-range_offset..=range.end()-range_offset);
+        let index = *range.start() - range_offset;
+        expression.drain(range.start() - range_offset..=range.end() - range_offset);
+        expression.insert(index, token);
+        // println!("expression : {expression:?}");
+        range_offset += range.count() - 1;
+    }
+
+    expression
+}
+
+//
+// fn determine_reduced_addition_subtraction_operator(expression: &Expression) -> Result<Operator,
 
 // todo : build a eval single operator single operand for things like factorial or a negative sign present by itself next to a number
 // fn reduce_addition_subtraction_operators()
 
-
 /// this will find the end of a sub expression by itterating through the token string and finding where the scope is enclosed.
 fn find_sub_expression_end(
-    tokens: &Expression,
+    expression: &Expression,
     expression_start_index: usize,
 ) -> Result<usize, String> {
-    if expression_start_index >= tokens.len() || tokens.get(expression_start_index).is_none() {
+    if expression_start_index >= expression.len()
+        || expression.get(expression_start_index).is_none()
+    {
         return Err("error : find_expression_end".to_string());
     }
 
     if expression_start_index == 0 {
-        return Ok(tokens.len() - 1);
+        return Ok(expression.len() - 1);
     }
 
     let mut current_expression_scope = 0;
-    for (i, token) in tokens.iter().enumerate().skip(expression_start_index) {
+    for (i, token) in expression.iter().enumerate().skip(expression_start_index) {
         if token.is_open_paren() {
             current_expression_scope += 1
         } else if token.is_close_paren() {
@@ -128,8 +194,8 @@ fn find_sub_expression_end(
 }
 
 /// this will check if a token string is solved. if there is only one number token left in the token string the expression is solved.
-fn is_solved_token_string(tokens: &Expression) -> bool {
-    if tokens.len() == 1 && tokens.first().is_some_and(|token| token.is_num()) {
+fn is_solved_token_string(expression: &Expression) -> bool {
+    if expression.len() == 1 && expression.first().is_some_and(|token| token.is_num()) {
         true
     } else {
         false
@@ -139,19 +205,25 @@ fn is_solved_token_string(tokens: &Expression) -> bool {
 /// this will evaluate a string math expression
 pub fn eval_str(string: &str) -> Result<f64, String> {
     let token_string = parse_str(string)?;
-    eval_expression(token_string)
+    eval_expression(token_string, true)
 }
 
 /// this will evaluate a token string expresssion recursively.
-pub fn eval_expression(tokens: Expression) -> Result<f64, String> {
+pub fn eval_expression(expression: Expression, first_call : bool) -> Result<f64, String> {
     // if the token string comes in solved return the solved answer
-    if is_solved_token_string(&tokens) {
-        return Ok(tokens.first().unwrap().to_f64().unwrap());
+    if is_solved_token_string(&expression) {
+        return Ok(expression.first().unwrap().to_f64().unwrap());
+    }
+
+    let mut expression = expression;
+
+    if first_call {
+        expression = reduce_addition_subtraction_operators(expression)
     }
 
     // find each sub expression and store a list of the answer and range of tokens they will replace.
     let mut sub_expression_solutions: Vec<(Token, RangeInclusive<usize>)> = vec![];
-    for (index, _token) in tokens
+    for (index, _token) in expression
         .iter()
         .enumerate()
         .filter(|(_index, token)| token.is_open_paren())
@@ -165,16 +237,16 @@ pub fn eval_expression(tokens: Expression) -> Result<f64, String> {
 
         // todo : figure out if there is a sub expression OR a function that needs to get solved.
         let pre_calc_start_index = index + 1;
-        let pre_calc_end_index = find_sub_expression_end(&tokens, pre_calc_start_index)?;
+        let pre_calc_end_index = find_sub_expression_end(&expression, pre_calc_start_index)?;
 
         // if the prior token to the open paren is an identity, a function is being invoked and must be solved, otherwise solve a sub expression.
         let sub_expression_result_range = if index != 0
-            && tokens
+            && expression
                 .iter()
                 .nth(index - 1)
                 .is_some_and(|token| token.is_identity())
         {
-            let function_signature = tokens
+            let function_signature = expression
                 .iter()
                 .nth(index - 1)
                 .unwrap()
@@ -182,7 +254,7 @@ pub fn eval_expression(tokens: Expression) -> Result<f64, String> {
                 .unwrap();
             let function_result = try_eval_builtin_math_function(
                 function_signature,
-                tokens[pre_calc_start_index..=pre_calc_end_index].to_vec(),
+                expression[pre_calc_start_index..=pre_calc_end_index].to_vec(),
             )?;
             (
                 Token::Number(function_result),
@@ -190,7 +262,7 @@ pub fn eval_expression(tokens: Expression) -> Result<f64, String> {
             )
         } else {
             let sub_expression_result =
-                eval_expression(tokens[pre_calc_start_index..=pre_calc_end_index].to_vec())?;
+                eval_expression(expression[pre_calc_start_index..=pre_calc_end_index].to_vec(), false)?;
             (
                 Token::Number(sub_expression_result),
                 index..=pre_calc_end_index + 1,
@@ -201,7 +273,7 @@ pub fn eval_expression(tokens: Expression) -> Result<f64, String> {
     }
 
     // replace each token in the string with
-    let mut after_sub_expressions = tokens;
+    let mut after_sub_expressions = expression;
     let mut reduction_offset = 0;
     for (token, range) in sub_expression_solutions {
         let offset_range = range.start() - reduction_offset..=range.end() - reduction_offset;
@@ -245,7 +317,7 @@ pub fn eval_expression(tokens: Expression) -> Result<f64, String> {
     if is_solved_token_string(&after_add_sub) {
         return Ok(after_add_sub.first().unwrap().to_f64().unwrap());
     }
-    
+
     Err("error : unsolved expression : {}".to_string())
 }
 
@@ -255,7 +327,7 @@ fn try_reduce_args(expression: Expression) -> Result<Expression, String> {
         .split(|token| token.is_argument_separator())
         .map(|expression| {
             println!("expression to reduce -> {expression:?}");
-            eval_expression(expression.to_vec())
+            eval_expression(expression.to_vec(), false)
         })
         .collect();
 
@@ -338,11 +410,11 @@ pub struct DynamicMathFunction {
     pub expression: Expression,
 }
 impl DynamicMathFunction {
-    pub fn anonymous(arg_names: Vec<String>, expression : Expression) -> Result<Self, String> {
+    pub fn anonymous(arg_names: Vec<String>, expression: Expression) -> Result<Self, String> {
         Ok(Self {
-            signature : None,
-            arg_names : arg_names,
-            expression : expression
+            signature: None,
+            arg_names: arg_names,
+            expression: expression,
         })
     }
 
@@ -385,6 +457,6 @@ impl DynamicMathFunction {
             })
             .collect();
 
-        eval_expression(expression_to_evaluate)
+        eval_expression(expression_to_evaluate, true)
     }
 }

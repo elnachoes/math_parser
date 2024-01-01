@@ -88,12 +88,13 @@ pub enum Operator {
     Division,
     Modulus,
     Exponentiation,
+    Factorial,
     OpenParen,
     CloseParen,
     ArgumentSeparator,
 }
 impl Operator {
-    pub fn apply_operation(&self, num1: f64, num2: f64) -> Result<f64, ()> {
+    pub fn apply_operation_2_operands(&self, num1: f64, num2: f64) -> Result<f64, ()> {
         match self {
             Self::Addition => Ok(num1 + num2),
             Self::Subtraction => Ok(num1 - num2),
@@ -102,6 +103,32 @@ impl Operator {
             Self::Modulus => Ok(num1 % num2),
             Self::Exponentiation => Ok(num1.powf(num2)),
             _ => Err(()),
+        }
+    }
+
+    pub fn apply_operation_1_operand(&self, num1: f64) -> Result<f64, ()> {
+        match self {
+            Self::Addition => Ok(num1),
+            Self::Subtraction => Ok(-num1),
+            _ => Err(()),
+        }
+    }
+
+    pub fn get_inverse_operator(&self) -> Option<Self> {
+        match self {
+            Self::Addition => Some(Self::Subtraction),
+            Self::Subtraction => Some(Self::Addition),
+            Self::Division => Some(Self::Multiplication),
+            Self::Multiplication => Some(Self::Division),
+            _ => None,
+        }
+    }
+
+    pub fn is_addition_or_subtraction(&self) -> bool {
+        if let Self::Addition | Self::Subtraction = self {
+            true
+        } else {
+            false
         }
     }
 }
