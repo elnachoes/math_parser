@@ -20,6 +20,11 @@ mod evaluator_tests {
 
     #[test]
     fn eval_reduced_addition_subtraction_expression() {
-        assert_eq!(1f64+1f64, eval_str("1-+-+-+-1").unwrap())
+        assert_eq!(1f64 + 1f64, eval_str("1-+-+-+-1").unwrap())
+    }
+
+    #[test]
+    fn eval_first_addition_subtraction_operator() {
+        assert_eq!(-2f64 + 2f64, eval_str("-2+2").unwrap())
     }
 }

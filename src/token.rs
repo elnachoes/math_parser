@@ -7,7 +7,7 @@ pub enum Token {
     Identity(String),
 }
 impl Token {
-    pub fn to_f64(&self) -> Option<f64> {
+    pub fn get_num(&self) -> Option<f64> {
         if let Token::Number(num) = self {
             Some(*num)
         } else {
@@ -74,6 +74,14 @@ impl Token {
             } else {
                 false
             }
+        } else {
+            false
+        }
+    }
+
+    pub fn is_operator(&self) -> bool {
+        if let Self::Operator(_) = self {
+            true
         } else {
             false
         }

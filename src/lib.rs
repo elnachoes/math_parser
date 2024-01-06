@@ -6,6 +6,3 @@ pub use parser::*;
 
 pub mod token;
 pub use token::*;
-
-// unit testing modules
-pub mod test;
