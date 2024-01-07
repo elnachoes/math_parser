@@ -142,12 +142,11 @@ pub fn reduce_addition_subtraction_operators(expression: Expression) -> Expressi
     expression
 }
 
-//
-// fn determine_reduced_addition_subtraction_operator(expression: &Expression) -> Result<Operator,
-
-// todo : build a eval single operator single operand for things like factorial or a negative sign present by itself next to a number
-
 fn reduce_first_addition_subtraction_operators(expression: Expression) -> Expression {
+    if expression.len() == 1 {
+        return expression
+    }
+    
     let mut expression = expression;
     match expression[0..2] {
         [Token::Operator(Operator::Addition), Token::Number(_)] => {
