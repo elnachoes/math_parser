@@ -79,6 +79,7 @@ fn try_parse_operator_token(
         '(' => Token::Operator(Operator::OpenParen),
         ')' => Token::Operator(Operator::CloseParen),
         ',' => Token::Operator(Operator::ArgumentSeparator),
+        ':' => Token::Operator(Operator::FunctionAssignment),
         _ => {
             return Err((
                 "error : parse_operator : could not parse char".to_string(),

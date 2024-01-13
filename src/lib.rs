@@ -6,3 +6,5 @@ pub use parser::*;
 
 pub mod token;
 pub use token::*;
+
+pub type Expression = Vec<Token>;

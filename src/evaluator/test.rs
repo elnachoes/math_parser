@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod evaluator_tests {
     use crate::eval_str;
+    use std::f64::consts;
 
     #[test]
     fn eval_with_sub_expressions_and_functions() {
@@ -26,5 +27,10 @@ mod evaluator_tests {
     #[test]
     fn eval_first_addition_subtraction_operator() {
         assert_eq!(-2f64 + 2f64, eval_str("-2+2").unwrap())
+    }
+
+    #[test]
+    fn eval_constant_expression() {
+        assert_eq!(consts::TAU * consts::PI, eval_str("tau * pi").unwrap())
     }
 }

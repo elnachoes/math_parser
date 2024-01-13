@@ -1,6 +1,6 @@
 use crate::*;
 use itertools::Itertools;
-use std::ops::RangeInclusive;
+use std::{ops::RangeInclusive, collections::HashMap};
 
 enum NumOpNumDirection {
     LeftToRight,
@@ -144,9 +144,9 @@ pub fn reduce_addition_subtraction_operators(expression: Expression) -> Expressi
 
 fn reduce_first_addition_subtraction_operators(expression: Expression) -> Expression {
     if expression.len() == 1 {
-        return expression
+        return expression;
     }
-    
+
     let mut expression = expression;
     match expression[0..2] {
         [Token::Operator(Operator::Addition), Token::Number(_)] => {
@@ -205,15 +205,30 @@ fn is_solved_token_string(expression: &Expression) -> bool {
 /// this will evaluate a string math expression
 pub fn eval_str(string: &str) -> Result<f64, String> {
     let token_string = parse_str(string)?;
-    eval_expression(token_string, true)
+    eval_expression(token_string, &MathDefinition::default_math_definitions(), true)
+}
+
+
+fn flatten_constants<'a>(expression: Expression, math_definitions : &HashMap<&'a str, MathDefinition>) -> Expression {
+    expression
+        .into_iter()
+        .map(|token| 
+            match token {
+                Token::Identity(identity) if math_definitions
+                    .get_key_value(identity.as_str())
+                    .is_some_and(|(_, math_definition)| math_definition.is_constant()) => Token::Number(math_definitions.get(identity.as_str()).unwrap().get_constant().unwrap()),
+                _ => token
+            }
+        )
+        .collect()
 }
 
 /// this will evaluate a token string expresssion recursively.
-pub fn eval_expression(expression: Expression, first_call: bool) -> Result<f64, String> {
-    let mut expression = expression;
-
+pub fn eval_expression<'a>(mut expression: Expression, math_definitions : &HashMap<&'a str, MathDefinition>, first_call: bool) -> Result<f64, String> {
     if first_call {
-        expression = reduce_addition_subtraction_operators(expression)
+        // TODO : flatten constants here 
+        expression = reduce_addition_subtraction_operators(expression);
+        expression = flatten_constants(expression, math_definitions)
     }
 
     // get rid of the first add/sub operator in something like : "- 1 + 2"
@@ -253,19 +268,32 @@ pub fn eval_expression(expression: Expression, first_call: bool) -> Result<f64, 
                 .iter()
                 .nth(index - 1)
                 .unwrap()
-                .identity_string()
+                .get_identity()
                 .unwrap();
-            let function_result = try_eval_builtin_math_function(
-                function_signature,
-                expression[pre_calc_start_index..=pre_calc_end_index].to_vec(),
-            )?;
-            (
-                Token::Number(function_result),
-                index - 1..=pre_calc_end_index + 1,
-            )
+
+            // let function = math_definitions.get(function_signature)
+
+
+            // TODO : fix this to use the new functions registry
+            let math_definition = math_definitions
+                .get(function_signature.as_str())
+                .ok_or(format!("could not find math definition with signature {function_signature:?}"))?;
+
+            let args = try_reduce_args(expression[pre_calc_start_index..=pre_calc_end_index].to_vec(), &math_definitions)?
+                .into_iter()
+                .map(|token| token.get_num().unwrap())
+                .collect::<Vec<f64>>();
+
+            let function_result = match math_definition {
+                MathDefinition::BuiltInFunction(function) => function.evaluate(&args, math_definitions)?,
+                MathDefinition::DefinedFunction(function) => function.evaluate(&args, math_definitions)?,
+                _ => return Err("asdf".to_string())
+            };
+            (Token::Number(function_result), index - 1..=pre_calc_end_index + 1)
         } else {
             let sub_expression_result = eval_expression(
                 expression[pre_calc_start_index..=pre_calc_end_index].to_vec(),
+                math_definitions,
                 false,
             )?;
             (
@@ -324,13 +352,11 @@ pub fn eval_expression(expression: Expression, first_call: bool) -> Result<f64, 
     Err("error : unsolved expression : {}".to_string())
 }
 
-pub fn try_reduce_args(expression: Expression) -> Result<Expression, String> {
-    println!("trying to reduce this expression : {expression:?}");
+pub fn try_reduce_args(expression: Expression, math_definitions : &HashMap<&str, MathDefinition>) -> Result<Expression, String> {
     let reduced_arguments: Vec<Result<f64, String>> = expression
         .split(|token| token.is_argument_separator())
         .map(|expression| {
-            println!("expression to reduce -> {expression:?}");
-            eval_expression(expression.to_vec(), false)
+            eval_expression(expression.to_vec(), math_definitions, false)
         })
         .collect();
 

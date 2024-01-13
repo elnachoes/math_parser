@@ -9,6 +9,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
 
 [[package]]
+name = "common_macros"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f3f6d59c71e7dc3af60f0af9db32364d96a16e9310f3f5db2b55ed642162dd35"
+
+[[package]]
 name = "either"
 version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -43,6 +49,7 @@ dependencies = [
 name = "math_parser"
 version = "1.0.0"
 dependencies = [
+ "common_macros",
  "factorial",
  "itertools",
 ]

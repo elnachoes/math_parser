@@ -1,4 +1,3 @@
-pub type Expression = Vec<Token>;
 
 #[derive(Clone, Debug)]
 pub enum Token {
@@ -23,7 +22,7 @@ impl Token {
         }
     }
 
-    pub fn identity_string(&self) -> Option<&str> {
+    pub fn get_identity(&self) -> Option<&String> {
         if let Self::Identity(identity) = self {
             Some(&identity)
         } else {
@@ -86,6 +85,14 @@ impl Token {
             false
         }
     }
+
+    pub fn is_argument_seperator(&self) -> bool {
+        if let Self::Operator(Operator::ArgumentSeparator) = self {
+            true
+        } else {
+            false
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -100,6 +107,7 @@ pub enum Operator {
     OpenParen,
     CloseParen,
     ArgumentSeparator,
+    FunctionAssignment,
 }
 impl Operator {
     pub fn apply_operation_2_operands(&self, num1: f64, num2: f64) -> Result<f64, ()> {
